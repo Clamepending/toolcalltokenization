@@ -738,6 +738,75 @@ def macro_has_binding(macro: dict) -> bool:
     return any("use=" in token or "def=" in token for token in macro.get("sequence", []))
 
 
+def binding_ids_in_token(token: str, field: str) -> List[str]:
+    prefix = f"{field}="
+    for part in str(token).split("|"):
+        if part.startswith(prefix):
+            return [value for value in part[len(prefix) :].split(",") if value]
+    return []
+
+
+def macro_interface(macro: dict) -> dict:
+    defined = set()
+    input_bindings: List[str] = []
+    local_bindings: List[str] = []
+
+    for token in macro.get("sequence", []):
+        for binding_id in binding_ids_in_token(token, "use"):
+            if binding_id not in defined and binding_id not in input_bindings:
+                input_bindings.append(binding_id)
+        for binding_id in binding_ids_in_token(token, "def"):
+            if binding_id not in defined:
+                defined.add(binding_id)
+                local_bindings.append(binding_id)
+
+    return {
+        "input_bindings": input_bindings,
+        "local_bindings": local_bindings,
+        "num_inputs": len(input_bindings),
+        "num_local_bindings": len(local_bindings),
+    }
+
+
+def macro_usage_summary(sequences: Dict[str, List[str]], macros: Sequence[dict]) -> dict:
+    macro_lookup = {macro["macro_id"]: macro for macro in macros}
+    per_macro = {
+        macro["macro_id"]: {
+            "macro_id": macro["macro_id"],
+            "length": len(macro.get("sequence", [])),
+            "has_binding": macro_has_binding(macro),
+            "macro_calls": 0,
+            "episodes_with_hits": 0,
+            "steps_saved": 0,
+        }
+        for macro in macros
+    }
+
+    for sequence in sequences.values():
+        _, hits = compress_sequence(sequence, macros)
+        for macro_id, count in hits.items():
+            if macro_id not in per_macro:
+                continue
+            per_macro[macro_id]["macro_calls"] += count
+            per_macro[macro_id]["episodes_with_hits"] += 1
+            per_macro[macro_id]["steps_saved"] += (len(macro_lookup[macro_id]["sequence"]) - 1) * count
+
+    items = sorted(
+        per_macro.values(),
+        key=lambda item: (-item["steps_saved"], -item["macro_calls"], item["macro_id"]),
+    )
+    return {
+        "summary": {
+            "macros_evaluated": len(items),
+            "macro_calls": sum(item["macro_calls"] for item in items),
+            "steps_saved": sum(item["steps_saved"] for item in items),
+            "parameterized_macro_calls": sum(item["macro_calls"] for item in items if item["has_binding"]),
+            "parameterized_steps_saved": sum(item["steps_saved"] for item in items if item["has_binding"]),
+        },
+        "macros": items,
+    }
+
+
 def compression_summary(sequences: Dict[str, List[str]], macros: Sequence[dict]) -> dict:
     episodes = []
     total_primitive = 0

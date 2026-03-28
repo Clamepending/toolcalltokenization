@@ -743,6 +743,69 @@ Examples surfaced by `website_task_family`:
 - `newegg::search`
   - `TYPE search use=B01 -> CLICK button`
 
+### Promotion into a candidate tool registry
+
+We now have an explicit promotion step.
+
+The purpose of promotion is:
+
+- not just to find repeated chunks
+- but to decide which chunks are good enough to become candidate agent tools
+
+The current promotion script is:
+
+- `scripts/promote_macros.py`
+
+The current action-space export script is:
+
+- `scripts/export_action_space.py`
+
+Promotion is now defined as:
+
+1. discover macros on train traces
+2. evaluate them on held-out traces
+3. keep only macros that are:
+   - supported across multiple train episodes
+   - function-like rather than generic click loops
+   - accurate enough on held-out replay
+   - useful enough in held-out step savings
+
+The current default promotion gate for the exploratory registry is:
+
+- grouped by `website_task_family`
+- `support >= 3`
+- held-out replay precision `>= 0.2`
+- at least `1` held-out exact replay
+- at least `1` held-out saved step
+- generic click-only loops filtered out unless explicitly allowed
+
+This is still an exploratory registry, not a production-quality action library.
+
+Current Mind2Web registry result:
+
+- `15` promoted macros
+- `14` parameterized promoted macros
+- `24` total actions in the exported pilot action space
+  - `9` primitive actions
+  - `15` promoted macros
+
+Examples from the current registry:
+
+- `united_flight_search_m002`
+  - `TYPE field use=B01 -> CLICK button -> TYPE field use=B02 -> CLICK button`
+- `yelp_search_m005`
+  - `CLICK link -> CLICK link -> TYPE zip use=B01 -> CLICK`
+- `newegg_search_m003`
+  - `TYPE search use=B01 -> CLICK button`
+
+This is the first point where the project has something that can be handed to a real agent:
+
+- a primitive action vocabulary
+- a promoted macro vocabulary
+- a combined action-space JSON
+
+The naming is still heuristic. A small LLM can now be used post-hoc to improve names and descriptions without changing the actual discovery or promotion criteria.
+
 ### Savings and replay metrics
 
 We now have two small evaluation scripts:

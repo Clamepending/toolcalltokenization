@@ -98,6 +98,19 @@ python3 scripts/macro_replay_eval.py \
   --group-by website_task_family \
   --min-group-episodes 3 \
   --trigger-prefix-len 1
+
+python3 scripts/promote_macros.py \
+  --input outputs/mind2web_full_train.jsonl \
+  --output outputs/mind2web_site_task_family_macro_registry.json \
+  --canonicalization-mode dataflow_coarse \
+  --group-by website_task_family \
+  --min-group-episodes 3 \
+  --min-promoted-support 3 \
+  --min-replay-precision 0.2
+
+python3 scripts/export_action_space.py \
+  --registry outputs/mind2web_site_task_family_macro_registry.json \
+  --output outputs/mind2web_site_task_family_action_space.json
 ```
 
 To sweep action representations instead of using just one canonical form, rerun
@@ -129,6 +142,8 @@ To measure utility instead of just discovery:
 
 - use `macro_savings_report.py` for step / token / decision-latency estimates
 - use `macro_replay_eval.py` for held-out exact replay precision
+- use `promote_macros.py` to turn held-out-approved macros into a registry
+- use `export_action_space.py` to combine primitives plus promoted macros into one action vocabulary
 
 The current savings numbers are still **decision-side estimates**, not real browser wall-clock timings. Real wall-clock measurements will need a controlled online benchmark.
 
@@ -137,6 +152,8 @@ Current best public-data finding:
 - `website_task_family` grouping makes `dataflow_coarse` materially more function-like on Mind2Web
 - held-out replay precision rises from `0.159` with site-only grouping to `0.2122`
 - parameterized replay precision rises from `0.129` to `0.1916`
+- the first promoted registry contains `15` candidate macros, `14` of them parameterized
+- the exported pilot action space contains `24` total actions: `9` primitives + `15` macros
 
 ## Why this starts offline
 

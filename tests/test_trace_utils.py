@@ -4,6 +4,7 @@ import unittest
 from toolcalltokenization.trace_utils import (
     apply_bpe_tokens,
     apply_macros,
+    binding_ids_in_token,
     CANONICALIZATION_MODES,
     canonicalize_event,
     compress_sequence,
@@ -12,6 +13,8 @@ from toolcalltokenization.trace_utils import (
     group_rows,
     infer_task_family,
     macro_has_binding,
+    macro_interface,
+    macro_usage_summary,
     mine_frequent_chunks,
     represent_rows,
     split_sequences,
@@ -207,6 +210,24 @@ class TraceUtilsTest(unittest.TestCase):
         self.assertTrue(macro_has_binding({"sequence": ["TYPE|use=B01", "CLICK"]}))
         self.assertFalse(macro_has_binding({"sequence": ["CLICK", "CLICK"]}))
 
+    def test_binding_ids_in_token(self) -> None:
+        self.assertEqual(binding_ids_in_token("TYPE|use=B01,B02|label=search", "use"), ["B01", "B02"])
+        self.assertEqual(binding_ids_in_token("COPY|def=B03", "def"), ["B03"])
+        self.assertEqual(binding_ids_in_token("CLICK", "use"), [])
+
+    def test_macro_interface_tracks_free_inputs(self) -> None:
+        interface = macro_interface(
+            {
+                "sequence": [
+                    "COPY|role=text|def=B01",
+                    "PASTE|role=input|use=B01",
+                    "TYPE|role=input|use=B02",
+                ]
+            }
+        )
+        self.assertEqual(interface["input_bindings"], ["B02"])
+        self.assertEqual(interface["local_bindings"], ["B01"])
+
     def test_frequent_chunk_is_mined(self) -> None:
         sequences = {
             "a": ["CLICK|label=search", "TYPE|value=<TEXT>", "CLICK|label=search"],
@@ -288,6 +309,24 @@ class TraceUtilsTest(unittest.TestCase):
         self.assertEqual(summary["summary"]["steps_saved"], 2)
         self.assertEqual(summary["summary"]["parameterized_macro_calls"], 2)
         self.assertEqual(summary["summary"]["estimated_output_tokens_saved"], 20)
+
+    def test_macro_usage_summary(self) -> None:
+        sequences = {
+            "a": ["TYPE|use=B01", "CLICK", "SCROLL"],
+            "b": ["TYPE|use=B01", "CLICK", "SCROLL"],
+        }
+        macros = [
+            {
+                "macro_id": "M001",
+                "sequence": ["TYPE|use=B01", "CLICK"],
+                "support": 2,
+                "occurrences": 2,
+            }
+        ]
+        usage = macro_usage_summary(sequences, macros)
+        self.assertEqual(usage["summary"]["macro_calls"], 2)
+        self.assertEqual(usage["summary"]["steps_saved"], 2)
+        self.assertEqual(usage["macros"][0]["episodes_with_hits"], 2)
 
     def test_evaluate_macro_replay(self) -> None:
         eval_sequences = {
