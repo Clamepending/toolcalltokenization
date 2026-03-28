@@ -61,6 +61,43 @@ python3 scripts/site_macro_report.py \
   --canonicalization-mode dataflow_coarse \
   --group-by website \
   --min-episodes 5
+
+python3 scripts/site_macro_report.py \
+  --input outputs/mind2web_full_train.jsonl \
+  --output outputs/mind2web_site_task_family_macros_dataflow_coarse.json \
+  --canonicalization-mode dataflow_coarse \
+  --group-by website_task_family \
+  --min-episodes 3
+
+python3 scripts/macro_savings_report.py \
+  --input outputs/mind2web_full_train.jsonl \
+  --output outputs/mind2web_site_dataflow_coarse_savings.json \
+  --canonicalization-mode dataflow_coarse \
+  --group-by website \
+  --min-group-episodes 5
+
+python3 scripts/macro_savings_report.py \
+  --input outputs/mind2web_full_train.jsonl \
+  --output outputs/mind2web_site_task_family_dataflow_coarse_savings.json \
+  --canonicalization-mode dataflow_coarse \
+  --group-by website_task_family \
+  --min-group-episodes 3
+
+python3 scripts/macro_replay_eval.py \
+  --input outputs/mind2web_full_train.jsonl \
+  --output outputs/mind2web_site_dataflow_coarse_replay.json \
+  --canonicalization-mode dataflow_coarse \
+  --group-by website \
+  --min-group-episodes 5 \
+  --trigger-prefix-len 1
+
+python3 scripts/macro_replay_eval.py \
+  --input outputs/mind2web_full_train.jsonl \
+  --output outputs/mind2web_site_task_family_dataflow_coarse_replay.json \
+  --canonicalization-mode dataflow_coarse \
+  --group-by website_task_family \
+  --min-group-episodes 3 \
+  --trigger-prefix-len 1
 ```
 
 To sweep action representations instead of using just one canonical form, rerun
@@ -81,6 +118,25 @@ Those seven modes are the current core experiment. Right now:
 
 If the goal is reusable workflow chunks rather than just compression, start with
 `site_macro_report.py` in `dataflow_coarse` mode.
+
+The most useful grouping keys right now are:
+
+- `website` for site-local workflow discovery
+- `task_family` for rough intent families inferred from task text
+- `website_task_family` for site-plus-intent grouping such as `amazon::cart` or `united::flight`
+
+To measure utility instead of just discovery:
+
+- use `macro_savings_report.py` for step / token / decision-latency estimates
+- use `macro_replay_eval.py` for held-out exact replay precision
+
+The current savings numbers are still **decision-side estimates**, not real browser wall-clock timings. Real wall-clock measurements will need a controlled online benchmark.
+
+Current best public-data finding:
+
+- `website_task_family` grouping makes `dataflow_coarse` materially more function-like on Mind2Web
+- held-out replay precision rises from `0.159` with site-only grouping to `0.2122`
+- parameterized replay precision rises from `0.129` to `0.1916`
 
 ## Why this starts offline
 

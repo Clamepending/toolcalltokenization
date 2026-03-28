@@ -124,6 +124,18 @@ COARSE_LABEL_HINTS = (
     ("cart", "cart"),
     ("result", "result"),
 )
+TASK_FAMILY_HINTS = (
+    ("auth", ("login", "log in", "sign in", "signin", "password", "register", "sign up", "signup")),
+    ("checkout", ("checkout", "check out", "payment", "billing", "place order", "complete purchase")),
+    ("cart", ("add to cart", "wishlist", "cart", "shopping bag", "bag")),
+    ("flight", ("flight", "airline", "depart", "return", "round trip", "one way")),
+    ("lodging", ("hotel", "homestay", "hostel", "room", "check in", "check-in", "check out", "check-out")),
+    ("rental", ("rental", "rent", "pickup", "dropoff", "drop-off", "car hire")),
+    ("reservation", ("reserve", "reservation", "booking", "book ")),
+    ("filter_sort", ("filter", "sort", "refine")),
+    ("profile", ("profile", "account", "settings", "edit profile", "update account")),
+    ("search", ("search", "find", "look up", "locate", "browse", "show")),
+)
 
 
 def load_jsonl(path: str) -> List[dict]:
@@ -238,6 +250,49 @@ def normalize_canonicalization_mode(mode: str) -> str:
         choices = ", ".join(CANONICALIZATION_MODES)
         raise ValueError(f"Unsupported canonicalization mode: {mode!r}. Expected one of: {choices}")
     return normalized
+
+
+def infer_task_family(row_or_text: object) -> str:
+    if isinstance(row_or_text, dict):
+        parts = [
+            str(row_or_text.get("task") or ""),
+            str(row_or_text.get("confirmed_task") or ""),
+            str(row_or_text.get("target_label") or ""),
+            str(row_or_text.get("raw_action_repr") or ""),
+        ]
+        text = " ".join(part for part in parts if part)
+    else:
+        text = str(row_or_text or "")
+
+    normalized = normalize_whitespace(text).lower()
+    if not normalized:
+        return "generic"
+    for family, hints in TASK_FAMILY_HINTS:
+        if any(hint in normalized for hint in hints):
+            return family
+    return "generic"
+
+
+def group_value_for_row(row: dict, group_by: str) -> str:
+    normalized = normalize_whitespace(str(group_by or "<all>")).lower()
+    if not normalized or normalized in {"<all>", "all"}:
+        return "<all>"
+    if normalized == "task_family":
+        return infer_task_family(row)
+    if normalized in {"website_task_family", "site_task_family"}:
+        website = str(row.get("website") or "<missing>")
+        return f"{website}::{infer_task_family(row)}"
+    if normalized == "domain_task_family":
+        domain = str(row.get("domain") or "<missing>")
+        return f"{domain}::{infer_task_family(row)}"
+    return str(row.get(group_by) or "<missing>")
+
+
+def group_rows(rows: Sequence[dict], group_by: str) -> Dict[str, List[dict]]:
+    grouped: Dict[str, List[dict]] = defaultdict(list)
+    for row in rows:
+        grouped[group_value_for_row(row, group_by)].append(row)
+    return grouped
 
 
 def normalize_event_name(value: object) -> str:
@@ -679,6 +734,10 @@ def apply_macros(sequences: Dict[str, List[str]], macros: Sequence[dict]) -> Dic
     }
 
 
+def macro_has_binding(macro: dict) -> bool:
+    return any("use=" in token or "def=" in token for token in macro.get("sequence", []))
+
+
 def compression_summary(sequences: Dict[str, List[str]], macros: Sequence[dict]) -> dict:
     episodes = []
     total_primitive = 0
@@ -714,6 +773,49 @@ def compression_summary(sequences: Dict[str, List[str]], macros: Sequence[dict])
         },
         "macro_hits": dict(macro_hits),
         "episodes": episodes,
+    }
+
+
+def summarize_macro_savings(
+    sequences: Dict[str, List[str]],
+    macros: Sequence[dict],
+    decision_tokens_per_step: int = 50,
+    decision_latency_ms: int = 1000,
+) -> dict:
+    compression = compression_summary(sequences, macros)
+    macro_lookup = {macro["macro_id"]: macro for macro in macros}
+    macro_hits = compression["macro_hits"]
+    macro_calls = sum(macro_hits.values())
+    weighted_span = sum(len(macro_lookup[macro_id]["sequence"]) * hits for macro_id, hits in macro_hits.items())
+    parameterized_macro_calls = sum(
+        hits for macro_id, hits in macro_hits.items() if macro_has_binding(macro_lookup[macro_id])
+    )
+    parameterized_steps_saved = sum(
+        (len(macro_lookup[macro_id]["sequence"]) - 1) * hits
+        for macro_id, hits in macro_hits.items()
+        if macro_has_binding(macro_lookup[macro_id])
+    )
+    primitive_steps = compression["summary"]["primitive_steps"]
+    compressed_steps = compression["summary"]["compressed_steps"]
+    steps_saved = primitive_steps - compressed_steps
+
+    return {
+        "summary": {
+            **compression["summary"],
+            "macro_calls": macro_calls,
+            "avg_macro_span": round(weighted_span / macro_calls, 4) if macro_calls else 0.0,
+            "steps_saved": steps_saved,
+            "decision_reduction_ratio": round(steps_saved / primitive_steps, 4) if primitive_steps else 0.0,
+            "parameterized_macro_calls": parameterized_macro_calls,
+            "parameterized_steps_saved": parameterized_steps_saved,
+            "estimated_model_decisions_baseline": primitive_steps,
+            "estimated_model_decisions_with_macros": compressed_steps,
+            "estimated_model_decisions_saved": steps_saved,
+            "estimated_output_tokens_saved": steps_saved * decision_tokens_per_step,
+            "estimated_decision_latency_saved_ms": steps_saved * decision_latency_ms,
+        },
+        "macro_hits": macro_hits,
+        "episodes": compression["episodes"],
     }
 
 
@@ -840,4 +942,93 @@ def evaluate_next_token_cache(
         "accuracy_on_covered": round(correct_positions / covered_positions, 4) if covered_positions else 0.0,
         "accuracy_overall": round(correct_positions / total_positions, 4) if total_positions else 0.0,
         "top_contexts": top_contexts,
+    }
+
+
+def evaluate_macro_replay(
+    macros: Sequence[dict],
+    eval_sequences: Dict[str, List[str]],
+    trigger_prefix_len: int = 1,
+) -> dict:
+    per_macro = []
+    exact_replay_episodes = set()
+    parameterized_replay_episodes = set()
+    total_candidates = 0
+    total_exact = 0
+    total_parameterized_candidates = 0
+    total_parameterized_exact = 0
+
+    for macro in macros:
+        sequence = list(macro.get("sequence", []))
+        if len(sequence) < 2:
+            continue
+        prefix_len = min(trigger_prefix_len, len(sequence) - 1)
+        prefix = sequence[:prefix_len]
+        has_binding = macro_has_binding(macro)
+        candidate_triggers = 0
+        exact_replays = 0
+        replay_episodes = set()
+
+        for episode_id, eval_sequence in eval_sequences.items():
+            for index in range(len(eval_sequence) - prefix_len + 1):
+                if eval_sequence[index : index + prefix_len] != prefix:
+                    continue
+                candidate_triggers += 1
+                if eval_sequence[index : index + len(sequence)] == sequence:
+                    exact_replays += 1
+                    replay_episodes.add(episode_id)
+
+        total_candidates += candidate_triggers
+        total_exact += exact_replays
+        if has_binding:
+            total_parameterized_candidates += candidate_triggers
+            total_parameterized_exact += exact_replays
+            parameterized_replay_episodes.update(replay_episodes)
+        exact_replay_episodes.update(replay_episodes)
+
+        per_macro.append(
+            {
+                "macro_id": macro["macro_id"],
+                "length": len(sequence),
+                "support": macro.get("support", 0),
+                "occurrences": macro.get("occurrences", 0),
+                "has_binding": has_binding,
+                "trigger_prefix_len": prefix_len,
+                "candidate_triggers": candidate_triggers,
+                "exact_replays": exact_replays,
+                "replay_precision": round(exact_replays / candidate_triggers, 4) if candidate_triggers else 0.0,
+                "episodes_with_exact_replay": len(replay_episodes),
+                "sequence": sequence,
+            }
+        )
+
+    per_macro.sort(
+        key=lambda item: (
+            -item["exact_replays"],
+            -item["replay_precision"],
+            -item["candidate_triggers"],
+            item["macro_id"],
+        )
+    )
+
+    parameterized_macros = [item for item in per_macro if item["has_binding"]]
+    return {
+        "summary": {
+            "macros_evaluated": len(per_macro),
+            "trigger_prefix_len": trigger_prefix_len,
+            "candidate_triggers": total_candidates,
+            "exact_replays": total_exact,
+            "replay_precision": round(total_exact / total_candidates, 4) if total_candidates else 0.0,
+            "episodes_with_exact_replay": len(exact_replay_episodes),
+            "parameterized_macros_evaluated": len(parameterized_macros),
+            "parameterized_candidate_triggers": total_parameterized_candidates,
+            "parameterized_exact_replays": total_parameterized_exact,
+            "parameterized_replay_precision": (
+                round(total_parameterized_exact / total_parameterized_candidates, 4)
+                if total_parameterized_candidates
+                else 0.0
+            ),
+            "episodes_with_parameterized_exact_replay": len(parameterized_replay_episodes),
+        },
+        "macros": per_macro,
     }

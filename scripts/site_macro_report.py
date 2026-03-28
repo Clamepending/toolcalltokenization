@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import argparse
 import sys
-from collections import defaultdict
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -14,8 +13,10 @@ if str(ROOT) not in sys.path:
 from toolcalltokenization.trace_utils import (
     CANONICALIZATION_MODES,
     dump_json,
+    group_rows,
     group_sequences,
     load_jsonl,
+    macro_has_binding,
     mine_frequent_chunks,
     represent_rows,
 )
@@ -36,7 +37,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--group-by",
         default="website",
-        help="Field to group traces by before mining, e.g. website or domain.",
+        help="Field or synthetic key to group traces by before mining, e.g. website, domain, task_family, or website_task_family.",
     )
     parser.add_argument("--min-episodes", type=int, default=5, help="Minimum episode count for a group to be reported.")
     parser.add_argument("--top-groups", type=int, default=20, help="Maximum number of groups to keep in the report.")
@@ -45,23 +46,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--min-support", type=int, default=2, help="Minimum episode support for a macro.")
     return parser.parse_args()
 
-
-def macro_has_binding(macro: dict) -> bool:
-    return any("use=" in token or "def=" in token for token in macro.get("sequence", []))
-
-
 def main() -> None:
     args = parse_args()
     rows = load_jsonl(args.input)
-
-    grouped_rows = defaultdict(list)
-    for row in rows:
-        group_key = str(row.get(args.group_by) or "<missing>")
-        grouped_rows[group_key].append(row)
+    grouped = group_rows(rows, args.group_by)
 
     report_groups = []
-    for group_key, group_rows in grouped_rows.items():
-        represented_rows = represent_rows(group_rows, mode=args.canonicalization_mode)
+    for group_key, rows_in_group in grouped.items():
+        represented_rows = represent_rows(rows_in_group, mode=args.canonicalization_mode)
         sequences = group_sequences(represented_rows)
         if len(sequences) < args.min_episodes:
             continue

@@ -7,10 +7,15 @@ from toolcalltokenization.trace_utils import (
     CANONICALIZATION_MODES,
     canonicalize_event,
     compress_sequence,
+    evaluate_macro_replay,
     evaluate_next_token_cache,
+    group_rows,
+    infer_task_family,
+    macro_has_binding,
     mine_frequent_chunks,
     represent_rows,
     split_sequences,
+    summarize_macro_savings,
     train_bpe_tokens,
 )
 
@@ -107,6 +112,22 @@ class TraceUtilsTest(unittest.TestCase):
             "TYPE|role=input|label=email|value=<EMAIL>",
         )
 
+    def test_infer_task_family_prefers_specific_workflow(self) -> None:
+        family = infer_task_family("Find flights from Chicago to London and return on April 23.")
+        self.assertEqual(family, "flight")
+
+    def test_group_rows_supports_website_task_family(self) -> None:
+        grouped = group_rows(
+            [
+                {"episode_id": "a", "website": "amazon", "task": "Add this item to my cart"},
+                {"episode_id": "b", "website": "amazon", "task": "Add another item to my cart"},
+                {"episode_id": "c", "website": "amazon", "task": "Find a laptop"},
+            ],
+            "website_task_family",
+        )
+        self.assertEqual(sorted(grouped), ["amazon::cart", "amazon::search"])
+        self.assertEqual(len(grouped["amazon::cart"]), 2)
+
     def test_dataflow_mode_alpha_renames_episode_inputs(self) -> None:
         rows = represent_rows(
             [
@@ -182,6 +203,10 @@ class TraceUtilsTest(unittest.TestCase):
         self.assertEqual(rows[0]["canonical_action"], "COPY|role=text|label=<TEXT>|def=B01")
         self.assertEqual(rows[1]["canonical_action"], "PASTE|role=input|label=<TEXT>|use=B01")
 
+    def test_macro_has_binding(self) -> None:
+        self.assertTrue(macro_has_binding({"sequence": ["TYPE|use=B01", "CLICK"]}))
+        self.assertFalse(macro_has_binding({"sequence": ["CLICK", "CLICK"]}))
+
     def test_frequent_chunk_is_mined(self) -> None:
         sequences = {
             "a": ["CLICK|label=search", "TYPE|value=<TEXT>", "CLICK|label=search"],
@@ -245,6 +270,48 @@ class TraceUtilsTest(unittest.TestCase):
         macros = [{"macro_id": "M001", "sequence": ["A", "B"], "support": 2}]
         compressed = apply_macros(sequences, macros)
         self.assertEqual(compressed["a"], ["MACRO:M001", "C"])
+
+    def test_summarize_macro_savings(self) -> None:
+        sequences = {
+            "a": ["TYPE|use=B01", "CLICK", "TYPE|use=B02", "CLICK"],
+            "b": ["TYPE|use=B01", "CLICK", "TYPE|use=B02", "CLICK"],
+        }
+        macros = [
+            {
+                "macro_id": "M001",
+                "sequence": ["TYPE|use=B01", "CLICK"],
+                "support": 2,
+                "occurrences": 2,
+            }
+        ]
+        summary = summarize_macro_savings(sequences, macros, decision_tokens_per_step=10, decision_latency_ms=100)
+        self.assertEqual(summary["summary"]["steps_saved"], 2)
+        self.assertEqual(summary["summary"]["parameterized_macro_calls"], 2)
+        self.assertEqual(summary["summary"]["estimated_output_tokens_saved"], 20)
+
+    def test_evaluate_macro_replay(self) -> None:
+        eval_sequences = {
+            "a": ["TYPE|use=B01", "CLICK", "TYPE|use=B02", "CLICK"],
+            "b": ["TYPE|use=B01", "CLICK", "SCROLL"],
+        }
+        macros = [
+            {
+                "macro_id": "M001",
+                "sequence": ["TYPE|use=B01", "CLICK"],
+                "support": 2,
+                "occurrences": 2,
+            },
+            {
+                "macro_id": "M002",
+                "sequence": ["TYPE|use=B02", "CLICK"],
+                "support": 1,
+                "occurrences": 1,
+            },
+        ]
+        replay = evaluate_macro_replay(macros, eval_sequences, trigger_prefix_len=1)
+        self.assertEqual(replay["summary"]["candidate_triggers"], 3)
+        self.assertEqual(replay["summary"]["exact_replays"], 3)
+        self.assertEqual(replay["summary"]["parameterized_replay_precision"], 1.0)
 
 
 if __name__ == "__main__":

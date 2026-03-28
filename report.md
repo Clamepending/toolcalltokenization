@@ -540,6 +540,43 @@ python3 scripts/site_macro_report.py \
   --canonicalization-mode dataflow_coarse \
   --group-by website \
   --min-episodes 5
+
+python3 scripts/site_macro_report.py \
+  --input outputs/mind2web_full_train.jsonl \
+  --output outputs/mind2web_site_task_family_macros_dataflow_coarse.json \
+  --canonicalization-mode dataflow_coarse \
+  --group-by website_task_family \
+  --min-episodes 3
+
+python3 scripts/macro_savings_report.py \
+  --input outputs/mind2web_full_train.jsonl \
+  --output outputs/mind2web_site_dataflow_coarse_savings.json \
+  --canonicalization-mode dataflow_coarse \
+  --group-by website \
+  --min-group-episodes 5
+
+python3 scripts/macro_savings_report.py \
+  --input outputs/mind2web_full_train.jsonl \
+  --output outputs/mind2web_site_task_family_dataflow_coarse_savings.json \
+  --canonicalization-mode dataflow_coarse \
+  --group-by website_task_family \
+  --min-group-episodes 3
+
+python3 scripts/macro_replay_eval.py \
+  --input outputs/mind2web_full_train.jsonl \
+  --output outputs/mind2web_site_dataflow_coarse_replay.json \
+  --canonicalization-mode dataflow_coarse \
+  --group-by website \
+  --min-group-episodes 5 \
+  --trigger-prefix-len 1
+
+python3 scripts/macro_replay_eval.py \
+  --input outputs/mind2web_full_train.jsonl \
+  --output outputs/mind2web_site_task_family_dataflow_coarse_replay.json \
+  --canonicalization-mode dataflow_coarse \
+  --group-by website_task_family \
+  --min-group-episodes 3 \
+  --trigger-prefix-len 1
 ```
 
 Then rerun `compare_tokenizers.py` with the other six representation modes and compare the outputs.
@@ -656,6 +693,108 @@ So the current lesson is:
 - global mining is good for testing representation stability
 - site-local `dataflow_coarse` is better for surfacing real candidate functions
 
+### Site-plus-workflow grouping
+
+Grouping by site alone still mixes several intents together. The next useful synthetic key is:
+
+- `website_task_family`
+
+This groups episodes by:
+
+- site or app
+- a coarse workflow family inferred from the task text
+
+Examples:
+
+- `amazon::cart`
+- `united::flight`
+- `yelp::search`
+- `aa::flight`
+- `newegg::search`
+
+This is still simple and fully programmable. It does not require semantic slot naming or an LLM. It just narrows mining to traces that are likely to share the same workflow skeleton.
+
+Current Mind2Web results with `dataflow_coarse` and `website_task_family`:
+
+- `133` reported groups with at least `3` episodes
+- held-out replay precision: `0.2122`
+- held-out parameterized replay precision: `0.1916`
+- estimated decision reduction: `29.34%`
+
+Compared with site-only grouping:
+
+- replay precision improves from `0.159` to `0.2122`
+- parameterized replay precision improves from `0.129` to `0.1916`
+
+This is the clearest result so far that the redundancy we want is mostly:
+
+- site-local
+- workflow-local
+- parameterized by a few anonymous values
+
+Examples surfaced by `website_task_family`:
+
+- `yelp::search`
+  - `TYPE zip use=B01 -> CLICK`
+- `united::flight`
+  - `TYPE field use=B01 -> CLICK button -> TYPE field use=B02 -> CLICK button`
+- `aa::flight`
+  - `TYPE city use=B01 -> CLICK link -> TYPE city use=B02 -> CLICK link`
+- `newegg::search`
+  - `TYPE search use=B01 -> CLICK button`
+
+### Savings and replay metrics
+
+We now have two small evaluation scripts:
+
+- `macro_savings_report.py`
+  - estimates step reduction
+  - estimates model-decision reduction
+  - estimates output-token savings
+  - estimates decision-latency savings
+- `macro_replay_eval.py`
+  - measures held-out exact replay precision from a trigger prefix
+  - reports both overall and parameterized-macro replay precision
+
+These are still offline or replay-style measurements. The latency numbers are **decision-side estimates**, not real browser wall-clock timings.
+
+Current results for `dataflow_coarse`:
+
+- Mind2Web global
+  - decision reduction estimate: `39.2%`
+  - replay precision: `5.28%`
+  - parameterized replay precision: `3.98%`
+- Mind2Web site-local by website
+  - decision reduction estimate: `34.11%`
+  - replay precision: `15.9%`
+  - parameterized replay precision: `12.9%`
+- Mind2Web site-local by `website_task_family`
+  - decision reduction estimate: `29.34%`
+  - replay precision: `21.22%`
+  - parameterized replay precision: `19.16%`
+- WebLINX BrowserGym global
+  - decision reduction estimate: `23.36%`
+  - replay precision: `4.33%`
+  - parameterized replay precision: `1.32%`
+
+Interpretation:
+
+- the savings potential is already non-trivial
+- blind global macro triggering is still too inaccurate
+- site-local grouping makes replay precision much better
+- site-plus-workflow grouping makes replay precision better still
+- this again points to state-aware and workflow-local triggering as the next real bottleneck
+
+Some site-local parameterized replay rates are already much stronger than the global average:
+
+- `kayak`: `0.70`
+- `gamestop`: `0.6667`
+- `amazon`: `0.3333`
+- `yelp`: `0.2985`
+- `united`: `0.2857`
+
+These are still small-scale and should be treated as exploratory, but they are exactly the sort of signal we want if the end goal is reusable functions.
+
 ### What this means
 
 The project is still on track, but the target is now sharper.
@@ -688,14 +827,21 @@ The next work should be:
    Examples:
    better role families, result-card detection, primary-action detection, modal controls
 
-3. Add **page-state context** to the cache key instead of only previous actions
+3. Add **page-state context** to the macro trigger instead of only previous actions
    Examples:
    URL pattern, form step, result-list page, detail page
 
-4. Keep raw-ish replay data in the loop
+4. Turn the new replay metrics into a site-family benchmark
+   Examples:
+   per-site replay precision, per-site step savings, parameterized macro counts
+
+5. Measure real browser wall-clock time in a controlled benchmark
+   Use WorkArena-L1 or a small local Playwright benchmark.
+
+6. Keep raw-ish replay data in the loop
    WebLINX BrowserGym stays useful even without raw Mind2Web traces.
 
-5. Treat raw Mind2Web `trace.zip` as a later upgrade
+7. Treat raw Mind2Web `trace.zip` as a later upgrade
    Useful for finer timing and Playwright-level replay, but no longer needed to answer the current question.
 
 ### Experiment 2: macro quality by source
