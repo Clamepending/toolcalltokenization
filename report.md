@@ -576,7 +576,7 @@ python3 scripts/macro_replay_eval.py \
   --canonicalization-mode dataflow_coarse \
   --group-by website_task_family \
   --min-group-episodes 3 \
-  --trigger-prefix-len 1
+  --trigger-prefix-len 2
 ```
 
 Then rerun `compare_tokenizers.py` with the other six representation modes and compare the outputs.
@@ -778,7 +778,8 @@ The current default promotion gate for the exploratory registry is:
 
 - grouped by `website_task_family`
 - `support >= 3`
-- held-out replay precision `>= 0.2`
+- trigger prefix length `= 2`
+- held-out replay precision `>= 0.5`
 - at least `1` held-out exact replay
 - at least `1` held-out saved step
 - generic click-only loops filtered out unless explicitly allowed
@@ -820,23 +821,32 @@ We now have an offline replay-style macro-agent simulation:
 
 This is still optimistic in some ways and pessimistic in others, but it is a much better approximation than pure compression.
 
-Current Mind2Web result with the default exploratory registry:
+Current Mind2Web result with the current promoted registry:
 
 - evaluated groups: `171`
 - groups with macros available: `14`
-- attempted macro calls: `28`
+- attempted macro calls: `21`
 - successful macro calls: `18`
-- failed macro calls: `10`
-- macro success rate: `0.6429`
+- failed macro calls: `3`
+- macro success rate: `0.8571`
 - primitive held-out steps: `1333`
-- macro-agent decisions: `1313`
-- net decision reduction: `1.5%`
+- macro-agent decisions: `1306`
+- net decision reduction: `2.03%`
 
 Interpretation:
 
 - the promoted macros are genuinely usable in some groups
 - but coverage is still small
-- failed macro attempts eat into the compression gains quickly
+- stronger trigger preconditions help a lot
+- coverage is now the bigger limiter than outright trigger failure
+
+More concretely:
+
+- promoted macros are available in `14 / 171` evaluated groups
+- those covered groups account for only about `13.9%` of held-out primitive steps
+- but within the covered groups, the macro-agent saves about `14.6%` of decisions
+
+So the overall `2.03%` gain is mostly a **coverage bottleneck**, not a sign that the promoted macros are useless where they apply.
 
 This is the first result that really matters for a future online agent:
 
@@ -844,18 +854,35 @@ This is the first result that really matters for a future online agent:
 - once failed attempts are priced in, the net gain is smaller
 - so trigger precision and coverage are now the central bottlenecks
 
-### Promotion-threshold sweep
+### Trigger and promotion sweep
 
-We also ran a small exploratory sweep over registry strictness.
+We also ran a small exploratory sweep over trigger strength and registry strictness.
 
-Default exploratory registry:
+Older 1-step trigger policy with the same broad promotion gate:
 
 - `15` promoted macros
 - `14` parameterized
 - `20` net saved decisions
 - `0.6429` macro success rate
+- `10` failed macro attempts
 
-Stricter registry with held-out replay precision `>= 0.5`:
+Current 2-step trigger policy:
+
+- `15` promoted macros
+- `14` parameterized
+- `27` net saved decisions
+- `0.8571` macro success rate
+- `3` failed macro attempts
+
+The 2-step trigger also improves held-out replay metrics before simulation:
+
+- replay precision rises from `0.2122` to `0.3212`
+- parameterized replay precision rises from `0.1916` to `0.3482`
+
+Increasing the trigger prefix from `2` to `3` did not improve the simulation further.
+That likely reflects the current macro library being short on average, so a 2-step prefix already captures most of the available extra context.
+
+For comparison, the older stricter 1-step registry with held-out replay precision `>= 0.5` gave:
 
 - `12` promoted macros
 - `12` parameterized
@@ -865,17 +892,18 @@ Stricter registry with held-out replay precision `>= 0.5`:
 
 Interpretation:
 
-- a looser registry gives slightly more total savings
-- a stricter registry is much cleaner and much safer
+- stronger preconditions mattered more than we expected
+- a 2-step trigger captures a lot of low-hanging precision gains
+- once trigger quality improves, the strictness of the replay threshold matters less
 - this suggests a real agent should probably support more than one promotion tier:
-  - a high-confidence tier for automatic macro use
+  - a high-confidence tier with stronger preconditions for automatic macro use
   - a broader exploratory tier for ablation studies or assisted selection
 
 This threshold tradeoff is a promising result rather than a failure.
 It means the current bottleneck is no longer “can we find any macros?” but:
 
 - how should we trade off coverage and precision?
-- what preconditions or page-state checks let us recover coverage without paying so many failed attempts?
+- what extra page-state checks let us recover coverage now that trigger-prefix matching is no longer the main problem?
 
 ### Savings and replay metrics
 

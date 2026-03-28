@@ -97,7 +97,7 @@ python3 scripts/macro_replay_eval.py \
   --canonicalization-mode dataflow_coarse \
   --group-by website_task_family \
   --min-group-episodes 3 \
-  --trigger-prefix-len 1
+  --trigger-prefix-len 2
 
 python3 scripts/promote_macros.py \
   --input outputs/mind2web_full_train.jsonl \
@@ -105,8 +105,7 @@ python3 scripts/promote_macros.py \
   --canonicalization-mode dataflow_coarse \
   --group-by website_task_family \
   --min-group-episodes 3 \
-  --min-promoted-support 3 \
-  --min-replay-precision 0.2
+  --min-promoted-support 3
 
 python3 scripts/export_action_space.py \
   --registry outputs/mind2web_site_task_family_macro_registry.json \
@@ -161,10 +160,13 @@ Current best public-data finding:
 - `website_task_family` grouping makes `dataflow_coarse` materially more function-like on Mind2Web
 - held-out replay precision rises from `0.159` with site-only grouping to `0.2122`
 - parameterized replay precision rises from `0.129` to `0.1916`
-- the first promoted registry contains `15` candidate macros, `14` of them parameterized
+- moving from a `1`-step to a `2`-step trigger prefix raises held-out replay precision from `0.2122` to `0.3212`
+- parameterized replay precision rises from `0.1916` to `0.3482`
+- the current promoted registry contains `15` candidate macros, `14` of them parameterized
 - the exported pilot action space contains `24` total actions: `9` primitives + `15` macros
-- the first macro-agent simulation saves `20` decisions over `1333` held-out primitive steps, about `1.5%`, with a `0.6429` macro success rate
-- a stricter registry with replay precision `>= 0.5` saves fewer decisions (`15`) but improves macro success rate to `0.8667`
+- with the stronger 2-step trigger policy, the macro-agent simulation saves `27` decisions over `1333` held-out primitive steps, about `2.03%`
+- under that policy, macro success rate improves from `0.6429` to `0.8571` and failed attempts drop from `10` to `3`
+- the main remaining bottleneck is coverage: promoted macros only cover about `13.9%` of held-out primitive steps, although within covered groups they save about `14.6%` of decisions
 
 ## Why this starts offline
 
