@@ -54,6 +54,13 @@ python3 scripts/profile_traces.py \
   --input outputs/mind2web_full_train.jsonl \
   --output outputs/mind2web_full_train_coarse_signature_profile.json \
   --canonicalization-mode coarse_signature
+
+python3 scripts/site_macro_report.py \
+  --input outputs/mind2web_full_train.jsonl \
+  --output outputs/mind2web_site_macros_dataflow_coarse.json \
+  --canonicalization-mode dataflow_coarse \
+  --group-by website \
+  --min-episodes 5
 ```
 
 To sweep action representations instead of using just one canonical form, rerun
@@ -64,9 +71,16 @@ To sweep action representations instead of using just one canonical form, rerun
 - `--canonicalization-mode coarse_signature`
 - `--canonicalization-mode target_signature`
 - `--canonicalization-mode signature`
+- `--canonicalization-mode dataflow`
+- `--canonicalization-mode dataflow_coarse`
 
-Those five modes are the current core experiment. Right now `coarse_signature`
-is the best midpoint between “too generic” and “too brittle”.
+Those seven modes are the current core experiment. Right now:
+
+- `coarse_signature` is the best global browser-action baseline
+- `dataflow_coarse` is the most useful mode for surfacing function-like, parameterized macros
+
+If the goal is reusable workflow chunks rather than just compression, start with
+`site_macro_report.py` in `dataflow_coarse` mode.
 
 ## Why this starts offline
 

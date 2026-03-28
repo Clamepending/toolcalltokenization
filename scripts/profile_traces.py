@@ -13,10 +13,10 @@ if str(ROOT) not in sys.path:
 
 from toolcalltokenization.trace_utils import (
     CANONICALIZATION_MODES,
-    canonicalize_event,
     dump_json,
     group_sequences,
     load_jsonl,
+    represent_rows,
 )
 
 
@@ -36,7 +36,7 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    rows = [canonicalize_event(row, mode=args.canonicalization_mode) for row in load_jsonl(args.input)]
+    rows = represent_rows(load_jsonl(args.input), mode=args.canonicalization_mode)
     sequences = group_sequences(rows)
     lengths = [len(sequence) for sequence in sequences.values()]
     actions = Counter(row["canonical_action"] for row in rows if row.get("canonical_action"))

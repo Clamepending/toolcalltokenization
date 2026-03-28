@@ -104,7 +104,7 @@ So the order is:
 
 The main new lesson from the public-data experiments is that we should treat **action representation** as a first-class variable.
 
-The harness now supports five canonicalization modes:
+The harness now supports seven representation modes:
 
 1. `name_only`
    Keep only the action name such as `CLICK`, `TYPE`, `GOTO`.
@@ -120,6 +120,12 @@ The harness now supports five canonicalization modes:
 
 5. `signature`
    Keep the action name plus target signature plus typed-value slots.
+
+6. `dataflow`
+   Keep the action name plus anonymous variable uses and defs such as `use=B01` and `def=B02`.
+
+7. `dataflow_coarse`
+   Keep anonymous variable uses and defs, plus the `coarse_signature` target abstraction.
 
 This is the current core experiment because it isolates the real tradeoff:
 
@@ -157,6 +163,32 @@ So `coarse_signature` is not meant to be the final abstraction. It is a cheap ap
 - `copyable_text`
 
 Right now it is the first representation that is coarse enough to reuse, but still structured enough to be more than `CLICK`.
+
+## What `dataflow_coarse` adds
+
+`coarse_signature` still hides whether the same value is reused across steps.
+
+`dataflow_coarse` adds anonymous variable identity on top of that. The variable names are arbitrary and episode-local, but alpha-renamed so repeated templates line up across traces.
+
+Examples:
+
+| Raw-ish workflow | `coarse_signature` | `dataflow_coarse` |
+| --- | --- | --- |
+| type email, type password, click login | `TYPE email <EMAIL>`, `TYPE password <TEXT>`, `CLICK login` | `TYPE|role=input|label=email|use=B01`, `TYPE|role=input|label=password|use=B02`, `CLICK|role=button|label=login` |
+| copy text, paste same text | `COPY|role=text|label=<TEXT>`, `PASTE|role=input|label=<TEXT>|value=<TEXT>` | `COPY|role=text|label=<TEXT>|def=B01`, `PASTE|role=input|label=<TEXT>|use=B01` |
+| search with an input value | `TYPE|role=input|label=search|value=<SEARCH_TERM>`, `CLICK search` | `TYPE|role=input|label=search|use=B01`, `CLICK|role=button|label=search` |
+
+This is closer to a function template:
+
+- the exact literal values are gone
+- reuse of the same argument is still visible
+- copied or produced values can feed later actions
+
+So `dataflow_coarse` is the first mode that can express templates like:
+
+- `LOGIN(B01, B02)`
+- `SEARCH(B01)`
+- `COPY_THEN_PASTE(B01)`
 
 ## Clarifying the real objective
 
@@ -305,7 +337,8 @@ Expected outcome:
 
 - `name_only` should score high on support and reuse, but low on semantic quality
 - `signature` should score higher on interpretability, but lower on support
-- `coarse_signature` should be the best middle ground
+- `coarse_signature` should be the best global middle ground
+- `dataflow_coarse` should be the best mode for parameterized workflow templates
 
 ### 2. Parameterization quality
 
@@ -379,6 +412,8 @@ Compare:
 - `coarse_signature`
 - `target_signature`
 - `signature`
+- `dataflow`
+- `dataflow_coarse`
 
 Measure:
 
@@ -391,7 +426,8 @@ Measure:
 Expected outcome:
 
 - already mostly confirmed
-- `coarse_signature` should stay the best public-data baseline
+- `coarse_signature` should stay the best global browser baseline
+- `dataflow_coarse` should do better once we mine within site or workflow families
 
 ### Experiment B: macro parameterization study
 
@@ -497,9 +533,16 @@ python3 scripts/compare_tokenizers.py \
   --bpe-min-support 5 \
   --train-ratio 0.8 \
   --context-len 1
+
+python3 scripts/site_macro_report.py \
+  --input outputs/mind2web_full_train.jsonl \
+  --output outputs/mind2web_site_macros_dataflow_coarse.json \
+  --canonicalization-mode dataflow_coarse \
+  --group-by website \
+  --min-episodes 5
 ```
 
-Then rerun `compare_tokenizers.py` with the other four canonicalization modes and compare the outputs.
+Then rerun `compare_tokenizers.py` with the other six representation modes and compare the outputs.
 
 ## Results so far
 
@@ -519,6 +562,8 @@ Then rerun `compare_tokenizers.py` with the other four canonicalization modes an
 | `name_only` | 3 | 0.2974 | 0.2278 | 0.8312 | 0.3227 | 0.1241 |
 | `value_slots` | 18 | 0.3145 | 0.2712 | 0.8312 | 0.2744 | 0.1185 |
 | `coarse_signature` | 130 | 0.6041 | 0.6159 | 0.3210 | 0.1212 | 0.0856 |
+| `dataflow` | 22 | 0.3139 | 0.2475 | 0.8335 | 0.3116 | 0.1714 |
+| `dataflow_coarse` | 202 | 0.6080 | 0.6297 | 0.3179 | 0.1257 | 0.1123 |
 | `target_signature` | 5864 | 0.9783 | 0.9790 | 0.0424 | 0.0202 | 0.0202 |
 | `signature` | 5875 | 0.9836 | 0.9849 | 0.0416 | 0.0255 | 0.0239 |
 
@@ -530,12 +575,18 @@ Interpretation:
   - vocabulary drops from about `5.9k` to `130`
   - held-out compression improves a lot
   - the macros still preserve coarse target structure
+- `dataflow` by itself mostly stays too generic:
+  - it exposes anonymous argument reuse
+  - but global mining is still dominated by generic click loops
+- `dataflow_coarse` preserves the same global compression story as `coarse_signature`
+  - and adds explicit variable reuse like `use=B01`
+  - which matters more for site-local mining than for global mining
 - `target_signature` and `signature` produce more interpretable routines such as:
   - `CLICK input -> TYPE text`
   - `TYPE first name -> TYPE last name`
 - But they fragment almost completely because the action vocabulary explodes from `3-18` symbols to about `5.9k`.
 
-This is the clearest evidence yet that our main bottleneck is **representation brittleness**, not lack of data or lack of BPE capacity. The current best public-data baseline is `coarse_signature`, not raw `signature`.
+This is the clearest evidence yet that our main bottleneck is **representation brittleness**, not lack of data or lack of BPE capacity. The current best global browser baseline is `coarse_signature`, while `dataflow_coarse` is the best starting point for parameterized macro discovery.
 
 ### WebLINX BrowserGym replay sweep
 
@@ -544,6 +595,8 @@ This is the clearest evidence yet that our main bottleneck is **representation b
 | `name_only` | 12 | 0.3650 | 0.4380 | 0.6031 | 0.1591 | 0.1111 |
 | `value_slots` | 36 | 0.3869 | 0.4599 | 0.6031 | 0.0638 | 0.0877 |
 | `coarse_signature` | 144 | 0.7080 | 0.7737 | 0.1832 | 0.0330 | 0.0500 |
+| `dataflow` | 50 | 0.4672 | 0.5182 | 0.5954 | 0.0862 | 0.0308 |
+| `dataflow_coarse` | 175 | 0.7664 | 0.8248 | 0.1908 | 0.0505 | 0.0374 |
 | `target_signature` | 288 | 0.8540 | 0.8905 | 0.1298 | 0.0270 | 0.0259 |
 | `signature` | 289 | 0.8540 | 0.8905 | 0.1298 | 0.0270 | 0.0259 |
 
@@ -557,11 +610,51 @@ Interpretation:
 - `coarse_signature` is again the best middle ground:
   - it keeps useful routines like `CLICK(text) -> COPY(text)` and `OPEN_TAB -> SWITCH_TAB`
   - but it avoids most of the vocabulary explosion of raw signatures
+- `dataflow_coarse` adds parameter identity:
+  - `COPY ... def=B01`
+  - `PASTE ... use=B01`
+  - which is a better substrate for function templates than plain signatures
 - Richer signatures surface better routines:
   - `OPEN_TAB -> SWITCH_TAB`
   - `SCROLL -> CLICK(div)`
   - `CLICK(textarea) -> PASTE`
 - But those richer tokens still hurt simple cache accuracy.
+
+### Site-local Mind2Web macro mining
+
+Global mining is still too mixed to surface the most useful workflow redundancy. Grouping by site is much better.
+
+Using `site_macro_report.py` on the top `20` Mind2Web websites:
+
+- `dataflow_coarse` found parameterized macros in `17 / 20` sites
+- total parameterized macros across those sites: `118`
+- `coarse_signature` found `0` explicit parameterized macros because it does not track value identity
+
+Examples:
+
+- `budget`
+  - `CLICK link -> TYPE zip use=B01`
+  - `TYPE zip use=B01 -> CLICK text`
+- `united`
+  - `TYPE field use=B01 -> CLICK button`
+  - `TYPE field use=B01 -> CLICK button -> TYPE field use=B02 -> CLICK button`
+- `spothero`
+  - `TYPE city use=B01 -> CLICK text`
+- `yelp`
+  - `TYPE zip use=B01 -> CLICK`
+- `newegg`
+  - `TYPE search use=B01 -> CLICK button`
+
+This is much closer to the target object we actually want:
+
+- a reusable template
+- with explicit arguments
+- still tied to a site or workflow family
+
+So the current lesson is:
+
+- global mining is good for testing representation stability
+- site-local `dataflow_coarse` is better for surfacing real candidate functions
 
 ### What this means
 
@@ -573,29 +666,36 @@ What looks promising:
 - repeated browser routines definitely exist
 - richer replay data like WebLINX BrowserGym is already useful
 - coarse semantic target abstraction is a real improvement over raw signatures
+- anonymous variable tracking makes parameterized macros visible
+- site-local mining surfaces much more function-like redundancy than global mining
 
 What looks unlikely to work:
 
 - plain BPE over brittle target signatures
 - using raw selectors or labels as-is and expecting good transfer
 - claiming success from compression alone
+- relying on global mining alone to discover site-specific workflows
 
 ## Updated next steps
 
 The next work should be:
 
-1. Improve `coarse_signature` instead of adding more raw tokenizers
+1. Mine within site and task families, not just globally
+   Examples:
+   login, search, checkout, booking flows inside one site
+
+2. Improve `dataflow_coarse` instead of adding more raw tokenizers
    Examples:
    better role families, result-card detection, primary-action detection, modal controls
 
-2. Add **page-state context** to the cache key instead of only previous actions
+3. Add **page-state context** to the cache key instead of only previous actions
    Examples:
    URL pattern, form step, result-list page, detail page
 
-3. Keep raw-ish replay data in the loop
+4. Keep raw-ish replay data in the loop
    WebLINX BrowserGym stays useful even without raw Mind2Web traces.
 
-4. Treat raw Mind2Web `trace.zip` as a later upgrade
+5. Treat raw Mind2Web `trace.zip` as a later upgrade
    Useful for finer timing and Playwright-level replay, but no longer needed to answer the current question.
 
 ### Experiment 2: macro quality by source

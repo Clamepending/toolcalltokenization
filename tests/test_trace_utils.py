@@ -9,6 +9,7 @@ from toolcalltokenization.trace_utils import (
     compress_sequence,
     evaluate_next_token_cache,
     mine_frequent_chunks,
+    represent_rows,
     split_sequences,
     train_bpe_tokens,
 )
@@ -18,7 +19,15 @@ class TraceUtilsTest(unittest.TestCase):
     def test_canonicalization_modes_are_explicit(self) -> None:
         self.assertEqual(
             CANONICALIZATION_MODES,
-            ("name_only", "value_slots", "coarse_signature", "target_signature", "signature"),
+            (
+                "name_only",
+                "value_slots",
+                "coarse_signature",
+                "target_signature",
+                "signature",
+                "dataflow",
+                "dataflow_coarse",
+            ),
         )
 
     def test_canonicalize_type_uses_slot(self) -> None:
@@ -97,6 +106,81 @@ class TraceUtilsTest(unittest.TestCase):
             event["canonical_action"],
             "TYPE|role=input|label=email|value=<EMAIL>",
         )
+
+    def test_dataflow_mode_alpha_renames_episode_inputs(self) -> None:
+        rows = represent_rows(
+            [
+                {
+                    "episode_id": "a",
+                    "step_index": 0,
+                    "action_type": "type",
+                    "target_role": "input",
+                    "target_label": "Email",
+                    "value": "alice@example.com",
+                },
+                {
+                    "episode_id": "a",
+                    "step_index": 1,
+                    "action_type": "type",
+                    "target_role": "input",
+                    "target_label": "Password",
+                    "value": "secret-a",
+                },
+                {
+                    "episode_id": "b",
+                    "step_index": 0,
+                    "action_type": "type",
+                    "target_role": "input",
+                    "target_label": "Email",
+                    "value": "bob@example.com",
+                },
+                {
+                    "episode_id": "b",
+                    "step_index": 1,
+                    "action_type": "type",
+                    "target_role": "input",
+                    "target_label": "Password",
+                    "value": "secret-b",
+                },
+            ],
+            mode="dataflow_coarse",
+        )
+        canonical_actions = [row["canonical_action"] for row in rows]
+        self.assertEqual(
+            canonical_actions,
+            [
+                "TYPE|role=input|label=email|use=B01",
+                "TYPE|role=input|label=password|use=B02",
+                "TYPE|role=input|label=email|use=B01",
+                "TYPE|role=input|label=password|use=B02",
+            ],
+        )
+
+    def test_dataflow_mode_tracks_copy_paste_binding(self) -> None:
+        rows = represent_rows(
+            [
+                {
+                    "episode_id": "copy-demo",
+                    "step_index": 0,
+                    "action_type": "copy",
+                    "target_role": "p",
+                    "target_label": "Order number 12345",
+                },
+                {
+                    "episode_id": "copy-demo",
+                    "step_index": 1,
+                    "action_type": "paste",
+                    "target_role": "textarea",
+                    "target_label": "Message",
+                    "value": "Order number 12345",
+                },
+            ],
+            mode="dataflow_coarse",
+        )
+        self.assertEqual(rows[0]["binding_defs"], ["B01"])
+        self.assertEqual(rows[1]["binding_uses"], ["B01"])
+        self.assertEqual(rows[0]["canonical_action"], "COPY|role=text|label=<TEXT>|def=B01")
+        self.assertEqual(rows[1]["canonical_action"], "PASTE|role=input|label=<TEXT>|use=B01")
 
     def test_frequent_chunk_is_mined(self) -> None:
         sequences = {

@@ -15,7 +15,6 @@ from toolcalltokenization.trace_utils import (
     apply_bpe_tokens,
     apply_macros,
     bpe_summary,
-    canonicalize_event,
     dump_json,
     dump_jsonl,
     evaluate_next_token_cache,
@@ -23,6 +22,7 @@ from toolcalltokenization.trace_utils import (
     load_jsonl,
     mine_frequent_chunks,
     compression_summary,
+    represent_rows,
     split_sequences,
     train_bpe_tokens,
 )
@@ -56,7 +56,7 @@ def main() -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     rows = load_jsonl(args.input)
-    canonical_rows = [canonicalize_event(row, mode=args.canonicalization_mode) for row in rows]
+    canonical_rows = represent_rows(rows, mode=args.canonicalization_mode)
     canonical_path = output_dir / "canonical_trace.jsonl"
     dump_jsonl(str(canonical_path), canonical_rows)
 

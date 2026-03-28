@@ -11,18 +11,28 @@ import re
 
 SHORT_TEXT_MAX_LEN = 24
 SHORT_TEXT_MAX_WORDS = 3
-CANONICALIZATION_MODES = (
+EVENTWISE_MODES = (
     "name_only",
     "value_slots",
     "coarse_signature",
     "target_signature",
     "signature",
 )
+DATAFLOW_MODES = (
+    "dataflow",
+    "dataflow_coarse",
+)
+CANONICALIZATION_MODES = (
+    *EVENTWISE_MODES,
+    *DATAFLOW_MODES,
+)
 TEXT_KEYS = ("value", "text", "query", "search", "input")
 LABEL_KEYS = ("target_text", "target_label", "label", "name")
 ROLE_KEYS = ("target_role", "role")
 SELECTOR_KEYS = ("selector", "target_selector")
 SLOT_KEYS = ("slot", "value_slot")
+ARGUMENT_KEYS = ("arguments", "args")
+OUTPUT_KEYS = ("output", "result", "return_value", "return", "response")
 SLOT_HINTS = {
     "search": "SEARCH_TERM",
     "query": "SEARCH_TERM",
@@ -230,9 +240,95 @@ def normalize_canonicalization_mode(mode: str) -> str:
     return normalized
 
 
+def normalize_event_name(value: object) -> str:
+    text = normalize_whitespace(str(value or "unknown"))
+    if not text:
+        return "UNKNOWN"
+    text = re.sub(r"[^A-Za-z0-9]+", "_", text).strip("_")
+    return text.upper() or "UNKNOWN"
+
+
+def event_name(row: dict) -> str:
+    for key in ("function_name", "tool_name", "action_name", "action_type"):
+        value = row.get(key)
+        if value is None:
+            continue
+        text = str(value).strip()
+        if text:
+            return normalize_event_name(text)
+    return "UNKNOWN"
+
+
+def iter_scalar_values(value: object) -> Iterable[str]:
+    if value is None:
+        return
+    if isinstance(value, dict):
+        for child in value.values():
+            yield from iter_scalar_values(child)
+        return
+    if isinstance(value, (list, tuple)):
+        for child in value:
+            yield from iter_scalar_values(child)
+        return
+    text = str(value).strip()
+    if text:
+        yield text
+
+
+def binding_key_for_value(value: object) -> str:
+    normalized = normalize_whitespace(str(value))
+    return normalized
+
+
+def extract_input_literals(row: dict) -> List[str]:
+    values: List[str] = []
+    seen = set()
+    for key in ARGUMENT_KEYS:
+        if key not in row:
+            continue
+        for literal in iter_scalar_values(row.get(key)):
+            binding_key = binding_key_for_value(literal)
+            if not binding_key or binding_key in seen:
+                continue
+            values.append(literal)
+            seen.add(binding_key)
+    direct_value = pick_first(row, TEXT_KEYS)
+    if direct_value:
+        binding_key = binding_key_for_value(direct_value)
+        if binding_key not in seen:
+            values.append(direct_value)
+            seen.add(binding_key)
+    return values
+
+
+def extract_output_literals(row: dict) -> List[str]:
+    values: List[str] = []
+    seen = set()
+    for key in OUTPUT_KEYS:
+        if key not in row:
+            continue
+        for literal in iter_scalar_values(row.get(key)):
+            binding_key = binding_key_for_value(literal)
+            if not binding_key or binding_key in seen:
+                continue
+            values.append(literal)
+            seen.add(binding_key)
+    if str(row.get("action_type", "")).strip().lower() == "copy":
+        copied_value = pick_first(row, LABEL_KEYS)
+        binding_key = binding_key_for_value(copied_value)
+        if copied_value and binding_key not in seen:
+            values.append(copied_value)
+            seen.add(binding_key)
+    return values
+
+
 def canonicalize_event(row: dict, mode: str = "signature") -> dict:
     event = dict(row)
     mode = normalize_canonicalization_mode(mode)
+    if mode in DATAFLOW_MODES:
+        raise ValueError(
+            f"{mode!r} is sequence-aware and must be rendered via represent_rows(), not canonicalize_event()."
+        )
     action_type = str(event.get("action_type", "unknown")).strip().upper()
     raw_role = pick_first(event, ROLE_KEYS)
     raw_label = pick_first(event, LABEL_KEYS)
@@ -270,6 +366,109 @@ def canonicalize_event(row: dict, mode: str = "signature") -> dict:
     event["canonicalization_mode"] = mode
     event["canonical_action"] = "|".join(parts)
     return event
+
+
+def next_binding_id(index: int) -> str:
+    return f"B{index:02d}"
+
+
+def annotate_dataflow_episode(rows: Sequence[dict], include_coarse_target: bool = False) -> List[dict]:
+    value_to_binding: Dict[str, str] = {}
+    binding_sources: Dict[str, str] = {}
+    next_index = 1
+    output_rows: List[dict] = []
+
+    for row in sorted(rows, key=lambda item: int(item.get("step_index", 0))):
+        event = dict(row)
+        uses: List[str] = []
+        defs: List[str] = []
+        introduced: List[str] = []
+        used_values: List[str] = []
+        defined_values: List[str] = []
+
+        for literal in extract_input_literals(event):
+            binding_key = binding_key_for_value(literal)
+            if not binding_key:
+                continue
+            binding_id = value_to_binding.get(binding_key)
+            if not binding_id:
+                binding_id = next_binding_id(next_index)
+                next_index += 1
+                value_to_binding[binding_key] = binding_id
+                binding_sources[binding_id] = "input"
+                introduced.append(binding_id)
+            uses.append(binding_id)
+            used_values.append(binding_key)
+
+        for literal in extract_output_literals(event):
+            binding_key = binding_key_for_value(literal)
+            if not binding_key:
+                continue
+            binding_id = value_to_binding.get(binding_key)
+            if not binding_id:
+                binding_id = next_binding_id(next_index)
+                next_index += 1
+                value_to_binding[binding_key] = binding_id
+                binding_sources[binding_id] = "output"
+                introduced.append(binding_id)
+            defs.append(binding_id)
+            defined_values.append(binding_key)
+
+        parts = [event_name(event)]
+        if parts[0] == "GOTO":
+            parts.append(f"url={normalize_url(str(event.get('url', '')))}")
+        elif include_coarse_target:
+            raw_role = pick_first(event, ROLE_KEYS)
+            raw_label = pick_first(event, LABEL_KEYS)
+            role = coarse_role_name(raw_role)
+            label = coarse_label_name(raw_label)
+            if role:
+                parts.append(f"role={role}")
+            if label:
+                parts.append(f"label={label}")
+
+        if uses:
+            parts.append(f"use={','.join(uses)}")
+        if defs:
+            parts.append(f"def={','.join(defs)}")
+
+        event["canonicalization_mode"] = "dataflow_coarse" if include_coarse_target else "dataflow"
+        event["binding_uses"] = uses
+        event["binding_defs"] = defs
+        event["introduced_bindings"] = introduced
+        event["binding_use_values"] = used_values
+        event["binding_def_values"] = defined_values
+        event["binding_sources"] = {
+            binding_id: binding_sources[binding_id]
+            for binding_id in uses + defs
+            if binding_id in binding_sources
+        }
+        event["canonical_action"] = "|".join(parts)
+        output_rows.append(event)
+
+    return output_rows
+
+
+def represent_rows(rows: Sequence[dict], mode: str = "signature") -> List[dict]:
+    normalized_mode = normalize_canonicalization_mode(mode)
+    if normalized_mode in EVENTWISE_MODES:
+        return [canonicalize_event(row, mode=normalized_mode) for row in rows]
+
+    grouped: Dict[str, List[dict]] = defaultdict(list)
+    for row in rows:
+        episode_id = str(row.get("episode_id", "unknown"))
+        grouped[episode_id].append(row)
+
+    output_rows: List[dict] = []
+    include_coarse_target = normalized_mode == "dataflow_coarse"
+    for episode_id in sorted(grouped):
+        output_rows.extend(
+            annotate_dataflow_episode(
+                grouped[episode_id],
+                include_coarse_target=include_coarse_target,
+            )
+        )
+    return output_rows
 
 
 def group_sequences(rows: Iterable[dict]) -> Dict[str, List[str]]:
