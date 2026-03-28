@@ -348,6 +348,75 @@ This is a strong signal that:
 3. **Canonicalization quality dominates results.** If actions are mostly opaque selectors, useful chunks do not transfer.
 4. **BPE should require cross-episode support by default.** Without that, it overfits repeated patterns inside a single episode.
 
+## New local raw-ish sources
+
+We now have richer local sources under `data/local/`:
+
+1. **Mind2Web train_10**
+   - official task shard from `osunlp/Mind2Web`
+   - about `27 MB`
+   - 9 tasks and 49 actions after conversion
+   - useful as an ingestion-proof and canonicalization testbed
+
+2. **WebLINX BrowserGym replay sample**
+   - 30 demos with `replay.json`, `metadata.json`, and `form.json`
+   - about `195 MB` locally
+   - 745 browser actions after conversion with chat excluded
+   - much closer to the kind of replay-style traces we actually want
+
+3. **One full WebLINX BrowserGym demo**
+   - `apfyesq.zip` unpacked locally
+   - includes screenshots, DOM snapshots, AX trees, bboxes, and extra element properties
+   - this is the best current local source for improving semantic canonicalization beyond the replay event itself
+
+## Findings from the new raw-ish sources
+
+### Mind2Web train_10
+
+Converted profile:
+
+- 9 episodes
+- 49 actions
+- average length `5.44`
+
+Observed result:
+
+- no cross-episode frequent chunks
+- no BPE merges under the current support thresholds
+
+Interpretation:
+
+- this shard is too small and diverse for chunk discovery by itself
+- it is still useful for validating the Mind2Web ingestion path
+
+### WebLINX BrowserGym replay sample, 30 demos
+
+Converted profile:
+
+- 30 episodes
+- 745 browser actions
+- average length `24.83`
+
+Observed results:
+
+- in-sample frequent-chunk compression: `605 / 745`, ratio `0.8121`
+- in-sample BPE compression: `623 / 745`, ratio `0.8362`
+- held-out frequent-chunk compression: `117 / 137`, ratio `0.854`
+- held-out BPE compression: `122 / 137`, ratio `0.8905`
+
+Held-out next-token cache with 1-token context:
+
+- primitive overall accuracy: `0.1298`
+- frequent-chunk overall accuracy: `0.027`
+- BPE overall accuracy: `0.0259`
+
+Interpretation:
+
+- replay-style traces do show meaningful held-out compressibility
+- frequent chunks currently beat BPE slightly on compression
+- primitive actions are still far easier to cache with a naive next-token cache
+- the data is now rich enough that better canonicalization looks like the main opportunity, not more aggressive token merging
+
 ## Trace format
 
 Each event should be a single JSON object with simple fields like:

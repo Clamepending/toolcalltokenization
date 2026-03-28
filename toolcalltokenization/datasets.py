@@ -174,7 +174,8 @@ def convert_weblinx_replay(input_path: str, include_chat: bool = False) -> List[
             action = turn.get("action", {}) or {}
             args = action.get("arguments", {}) or {}
             metadata = args.get("metadata", {}) or {}
-            element = turn.get("element", {}) or {}
+            element = args.get("element") or turn.get("element", {}) or {}
+            attributes = element.get("attributes", {}) or {}
             properties = args.get("properties", {}) or {}
             events.append(
                 {
@@ -189,10 +190,11 @@ def convert_weblinx_replay(input_path: str, include_chat: bool = False) -> List[
                     "url": metadata.get("url"),
                     "tab_id": metadata.get("tabId"),
                     "target_role": element.get("tagName") or element.get("role"),
-                    "target_label": element.get("textContent") or element.get("ariaLabel"),
-                    "selector": args.get("xpath") or args.get("uid"),
-                    "value": args.get("text") or args.get("value") or args.get("utterance"),
+                    "target_label": pick_label_from_attributes(attributes) or element.get("textContent") or element.get("ariaLabel"),
+                    "selector": args.get("xpath") or element.get("xpath") or attributes.get("data-webtasks-id") or args.get("uid"),
+                    "value": args.get("text") or args.get("value") or args.get("utterance") or args.get("pasted"),
                     "element": element,
+                    "element_attributes": attributes,
                     "properties": properties,
                     "source_file": str(replay_path),
                 }

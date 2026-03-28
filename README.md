@@ -58,6 +58,8 @@ python3 scripts/compare_tokenizers.py \
 python3 scripts/profile_traces.py \
   --input data/demo/sample_trace.jsonl \
   --output outputs/demo/profile.json
+
+python3 scripts/fetch_public_data.py --all
 ```
 
 ## Why this starts offline
@@ -74,3 +76,7 @@ Current converters target:
 - WebLINX `replay.json` demonstrations
 - WebLINX processed chat/action JSONL or JSONL.GZ files
 - WONDERBREAD-style `trace.json` files
+
+## Local public data
+
+See [data/README.md](./data/README.md) for the small public dataset slices currently used by the repo.

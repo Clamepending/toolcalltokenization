@@ -55,9 +55,14 @@ class DatasetConvertersTest(unittest.TestCase):
                         "arguments": {
                             "text": "hello",
                             "metadata": {"url": "https://example.com"},
+                            "element": {
+                                "tagName": "input",
+                                "textContent": "",
+                                "xpath": "/html/body/input",
+                                "attributes": {"placeholder": "Search"},
+                            },
                         },
                     },
-                    "element": {"tagName": "input", "textContent": "Search"},
                 }
             ]
         }
@@ -71,6 +76,8 @@ class DatasetConvertersTest(unittest.TestCase):
         self.assertEqual(rows[0]["episode_id"], "demo-1")
         self.assertEqual(rows[0]["action_type"], "type")
         self.assertEqual(rows[0]["url"], "https://example.com")
+        self.assertEqual(rows[0]["target_label"], "Search")
+        self.assertEqual(rows[0]["selector"], "/html/body/input")
 
     def test_convert_wonderbread_trace(self) -> None:
         payload = {
