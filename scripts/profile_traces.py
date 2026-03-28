@@ -11,7 +11,13 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from toolcalltokenization.trace_utils import canonicalize_event, dump_json, group_sequences, load_jsonl
+from toolcalltokenization.trace_utils import (
+    CANONICALIZATION_MODES,
+    canonicalize_event,
+    dump_json,
+    group_sequences,
+    load_jsonl,
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -19,12 +25,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--input", required=True, help="Path to raw or converted JSONL trace events.")
     parser.add_argument("--output", required=True, help="Path to JSON summary.")
     parser.add_argument("--top-k", type=int, default=20, help="Number of top actions to report.")
+    parser.add_argument(
+        "--canonicalization-mode",
+        choices=CANONICALIZATION_MODES,
+        default="signature",
+        help="How much structure to keep in each canonical action string.",
+    )
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
-    rows = [canonicalize_event(row) for row in load_jsonl(args.input)]
+    rows = [canonicalize_event(row, mode=args.canonicalization_mode) for row in load_jsonl(args.input)]
     sequences = group_sequences(rows)
     lengths = [len(sequence) for sequence in sequences.values()]
     actions = Counter(row["canonical_action"] for row in rows if row.get("canonical_action"))
@@ -33,6 +45,7 @@ def main() -> None:
     summary = {
         "episodes": len(sequences),
         "events": len(rows),
+        "canonicalization_mode": args.canonicalization_mode,
         "avg_episode_length": round(sum(lengths) / len(lengths), 4) if lengths else 0.0,
         "max_episode_length": max(lengths) if lengths else 0,
         "min_episode_length": min(lengths) if lengths else 0,

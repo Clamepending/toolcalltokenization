@@ -11,6 +11,13 @@ import re
 
 SHORT_TEXT_MAX_LEN = 24
 SHORT_TEXT_MAX_WORDS = 3
+CANONICALIZATION_MODES = (
+    "name_only",
+    "value_slots",
+    "coarse_signature",
+    "target_signature",
+    "signature",
+)
 TEXT_KEYS = ("value", "text", "query", "search", "input")
 LABEL_KEYS = ("target_text", "target_label", "label", "name")
 ROLE_KEYS = ("target_role", "role")
@@ -32,6 +39,81 @@ SLOT_HINTS = {
     "zip": "ZIP",
     "postal": "ZIP",
 }
+COARSE_ROLE_ALIASES = {
+    "a": "link",
+    "link": "link",
+    "button": "button",
+    "input": "input",
+    "textarea": "input",
+    "searchbox": "input",
+    "textbox": "input",
+    "select": "select",
+    "combobox": "select",
+    "option": "option",
+    "checkbox": "choice",
+    "radio": "choice",
+    "tab": "tab",
+    "img": "media",
+    "image": "media",
+}
+TEXTISH_ROLES = {
+    "div",
+    "span",
+    "p",
+    "li",
+    "td",
+    "th",
+    "tr",
+    "label",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+}
+COARSE_LABEL_HINTS = (
+    ("add to cart", "add_to_cart"),
+    ("check out", "checkout"),
+    ("checkout", "checkout"),
+    ("sign in", "login"),
+    ("log in", "login"),
+    ("login", "login"),
+    ("sign up", "signup"),
+    ("register", "signup"),
+    ("first name", "first_name"),
+    ("last name", "last_name"),
+    ("phone", "phone"),
+    ("postal", "zip"),
+    ("zip", "zip"),
+    ("email", "email"),
+    ("password", "password"),
+    ("destination", "destination"),
+    ("origin", "origin"),
+    ("depart", "depart"),
+    ("return", "return"),
+    ("city", "city"),
+    ("location", "location"),
+    ("date", "date"),
+    ("time", "time"),
+    ("guest", "guests"),
+    ("adult", "adults"),
+    ("children", "children"),
+    ("search", "search"),
+    ("submit", "submit"),
+    ("save", "save"),
+    ("apply", "apply"),
+    ("filter", "filter"),
+    ("sort", "sort"),
+    ("next", "next"),
+    ("continue", "next"),
+    ("previous", "previous"),
+    ("back", "back"),
+    ("close", "close"),
+    ("menu", "menu"),
+    ("cart", "cart"),
+    ("result", "result"),
+)
 
 
 def load_jsonl(path: str) -> List[dict]:
@@ -121,32 +203,71 @@ def infer_slot_name(value: str, label: str) -> str:
     return ""
 
 
-def canonicalize_event(row: dict) -> dict:
+def coarse_role_name(value: str) -> str:
+    normalized = normalize_text_label(value)
+    if normalized in COARSE_ROLE_ALIASES:
+        return COARSE_ROLE_ALIASES[normalized]
+    if normalized in TEXTISH_ROLES:
+        return "text"
+    return normalized
+
+
+def coarse_label_name(value: str) -> str:
+    normalized = normalize_whitespace(value).lower()
+    if not normalized:
+        return ""
+    for hint, coarse_name in COARSE_LABEL_HINTS:
+        if hint in normalized:
+            return coarse_name
+    return "<TEXT>"
+
+
+def normalize_canonicalization_mode(mode: str) -> str:
+    normalized = str(mode or "signature").strip().lower()
+    if normalized not in CANONICALIZATION_MODES:
+        choices = ", ".join(CANONICALIZATION_MODES)
+        raise ValueError(f"Unsupported canonicalization mode: {mode!r}. Expected one of: {choices}")
+    return normalized
+
+
+def canonicalize_event(row: dict, mode: str = "signature") -> dict:
     event = dict(row)
+    mode = normalize_canonicalization_mode(mode)
     action_type = str(event.get("action_type", "unknown")).strip().upper()
-    role = normalize_text_label(pick_first(event, ROLE_KEYS))
-    label = normalize_text_label(pick_first(event, LABEL_KEYS))
+    raw_role = pick_first(event, ROLE_KEYS)
+    raw_label = pick_first(event, LABEL_KEYS)
+    role = normalize_text_label(raw_role)
+    label = normalize_text_label(raw_label)
     selector = normalize_text_label(pick_first(event, SELECTOR_KEYS))
     slot = normalize_text_label(pick_first(event, SLOT_KEYS)).upper()
     value = pick_first(event, TEXT_KEYS)
     parts = [action_type]
+    include_target = mode in {"coarse_signature", "target_signature", "signature"}
+    include_value = mode in {"value_slots", "coarse_signature", "signature"}
 
     if action_type == "GOTO":
-        parts.append(f"url={normalize_url(str(event.get('url', '')))}")
+        if mode != "name_only":
+            parts.append(f"url={normalize_url(str(event.get('url', '')))}")
     else:
-        if role:
-            parts.append(f"role={role}")
-        if label:
-            parts.append(f"label={label}")
-        elif selector:
-            parts.append(f"selector={selector}")
-        if value:
+        if include_target:
+            if mode == "coarse_signature":
+                role = coarse_role_name(raw_role)
+                label = coarse_label_name(raw_label)
+                selector = ""
+            if role:
+                parts.append(f"role={role}")
+            if label:
+                parts.append(f"label={label}")
+            elif selector:
+                parts.append(f"selector={selector}")
+        if include_value and value:
             inferred_slot = slot or infer_slot_name(value, label)
             if inferred_slot:
                 parts.append(f"value=<{inferred_slot}>")
             else:
                 parts.append(f"value={placeholder_for_value(value)}")
 
+    event["canonicalization_mode"] = mode
     event["canonical_action"] = "|".join(parts)
     return event
 

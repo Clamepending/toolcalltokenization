@@ -11,6 +11,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from toolcalltokenization.trace_utils import (
+    CANONICALIZATION_MODES,
     apply_bpe_tokens,
     apply_macros,
     bpe_summary,
@@ -40,6 +41,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--train-ratio", type=float, default=1.0, help="Fraction of episodes to use for training tokenizers.")
     parser.add_argument("--seed", type=int, default=0, help="Random seed for the train/test split.")
     parser.add_argument("--context-len", type=int, default=1, help="Prefix length for next-token cache evaluation.")
+    parser.add_argument(
+        "--canonicalization-mode",
+        choices=CANONICALIZATION_MODES,
+        default="signature",
+        help="How much structure to keep in each canonical action string.",
+    )
     return parser.parse_args()
 
 
@@ -49,7 +56,7 @@ def main() -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     rows = load_jsonl(args.input)
-    canonical_rows = [canonicalize_event(row) for row in rows]
+    canonical_rows = [canonicalize_event(row, mode=args.canonicalization_mode) for row in rows]
     canonical_path = output_dir / "canonical_trace.jsonl"
     dump_jsonl(str(canonical_path), canonical_rows)
 
@@ -80,6 +87,7 @@ def main() -> None:
         "input_rows": len(rows),
         "episodes": len(sequences),
         "primitive_steps": primitive_steps,
+        "canonicalization_mode": args.canonicalization_mode,
         "train_ratio": args.train_ratio,
         "frequent_chunks": {
             "num_macros": len(macros),
@@ -132,6 +140,7 @@ def main() -> None:
         holdout = {
             "train_episodes": len(train_sequences),
             "test_episodes": len(test_sequences),
+            "canonicalization_mode": args.canonicalization_mode,
             "frequent_chunk_compression": compression_summary(test_sequences, holdout_macros)["summary"],
             "bpe_compression": bpe_summary(test_sequences, holdout_merges)["summary"],
             "primitive_cache": primitive_cache,

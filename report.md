@@ -10,6 +10,17 @@ Build the smallest useful experiment for this question:
 
 This repo should stay simple. The first milestone is **offline and replay-oriented**, not a full agent platform.
 
+## Current status
+
+We can continue this study without Globus.
+
+The raw Mind2Web dump is still useful for future replay work, but it is **not a blocker** for the current experiment. The public Hugging Face releases already let us test the two most important questions:
+
+1. How sensitive are compression and caching to the action representation?
+2. Do public browser-action traces already show reusable multi-step routines?
+
+The answer to both is yes.
+
 ## What we are building first
 
 We are starting with four concrete pieces:
@@ -31,7 +42,7 @@ These are the first datasets we want to try.
 
 1. **Mind2Web**
    Why:
-   It is the best immediate source of replayable human browser traces with screenshots, snapshots, HAR, and Playwright traces.
+   The public task data is enough for structured action-sequence studies, and the raw dump becomes a later upgrade rather than a blocker.
 
 2. **WONDERBREAD**
    Why:
@@ -88,6 +99,32 @@ So the order is:
 - measure offline compressibility first
 - then plug macros into a controlled browser agent
 - only then test realism
+
+## Action representation modes
+
+The main new lesson from the public-data experiments is that we should treat **action representation** as a first-class variable.
+
+The harness now supports five canonicalization modes:
+
+1. `name_only`
+   Keep only the action name such as `CLICK`, `TYPE`, `GOTO`.
+
+2. `value_slots`
+   Keep the action name and typed-value slots, but not target signatures.
+
+3. `coarse_signature`
+   Keep the action name plus coarse role classes and a small semantic label vocabulary.
+
+4. `target_signature`
+   Keep the action name plus role / label / selector signature, but not typed-value slots.
+
+5. `signature`
+   Keep the action name plus target signature plus typed-value slots.
+
+This is the current core experiment because it isolates the real tradeoff:
+
+- coarse actions compress well but often collapse into generic junk
+- rich actions are more meaningful but fragment badly
 
 ## What we hope to see in the traces
 
@@ -191,6 +228,130 @@ Success condition:
 - we find readable, repeated routines and get non-trivial compression
 - held-out compression remains useful when macros are learned on train and applied to test
 - tokenized traces are at least as cacheable as primitive traces on held-out episodes
+
+## Public-only workflow
+
+The simplest reproducible path now is:
+
+```bash
+python3 scripts/fetch_public_data.py --mind2web-all-train
+
+python3 scripts/convert_dataset.py \
+  --source mind2web \
+  --input data/local/mind2web/data/train \
+  --output outputs/mind2web_full_train.jsonl
+
+python3 scripts/compare_tokenizers.py \
+  --input outputs/mind2web_full_train.jsonl \
+  --output-dir outputs/mind2web_full_train_coarse_signature \
+  --canonicalization-mode coarse_signature \
+  --top-k 100 \
+  --min-support 5 \
+  --num-merges 100 \
+  --min-occurrences 5 \
+  --bpe-min-support 5 \
+  --train-ratio 0.8 \
+  --context-len 1
+```
+
+Then rerun `compare_tokenizers.py` with the other four canonicalization modes and compare the outputs.
+
+## Results so far
+
+### Dataset sizes used in the latest pass
+
+- Public Mind2Web train shards from Hugging Face:
+  - `1009` tasks
+  - `7775` actions
+- WebLINX BrowserGym replay sample:
+  - `30` demos
+  - `745` actions
+
+### Public Mind2Web full-train sweep
+
+| Mode | Action vocab | Held-out macro ratio | Held-out BPE ratio | Primitive cache acc | Macro cache acc | BPE cache acc |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `name_only` | 3 | 0.2974 | 0.2278 | 0.8312 | 0.3227 | 0.1241 |
+| `value_slots` | 18 | 0.3145 | 0.2712 | 0.8312 | 0.2744 | 0.1185 |
+| `coarse_signature` | 130 | 0.6041 | 0.6159 | 0.3210 | 0.1212 | 0.0856 |
+| `target_signature` | 5864 | 0.9783 | 0.9790 | 0.0424 | 0.0202 | 0.0202 |
+| `signature` | 5875 | 0.9836 | 0.9849 | 0.0416 | 0.0255 | 0.0239 |
+
+Interpretation:
+
+- `name_only` and `value_slots` compress very strongly and are highly cacheable.
+- But the top macros are mostly generic routines like `CLICK -> CLICK -> CLICK`.
+- `coarse_signature` is the first useful midpoint:
+  - vocabulary drops from about `5.9k` to `130`
+  - held-out compression improves a lot
+  - the macros still preserve coarse target structure
+- `target_signature` and `signature` produce more interpretable routines such as:
+  - `CLICK input -> TYPE text`
+  - `TYPE first name -> TYPE last name`
+- But they fragment almost completely because the action vocabulary explodes from `3-18` symbols to about `5.9k`.
+
+This is the clearest evidence yet that our main bottleneck is **representation brittleness**, not lack of data or lack of BPE capacity. The current best public-data baseline is `coarse_signature`, not raw `signature`.
+
+### WebLINX BrowserGym replay sweep
+
+| Mode | Action vocab | Held-out macro ratio | Held-out BPE ratio | Primitive cache acc | Macro cache acc | BPE cache acc |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `name_only` | 12 | 0.3650 | 0.4380 | 0.6031 | 0.1591 | 0.1111 |
+| `value_slots` | 36 | 0.3869 | 0.4599 | 0.6031 | 0.0638 | 0.0877 |
+| `coarse_signature` | 144 | 0.7080 | 0.7737 | 0.1832 | 0.0330 | 0.0500 |
+| `target_signature` | 288 | 0.8540 | 0.8905 | 0.1298 | 0.0270 | 0.0259 |
+| `signature` | 289 | 0.8540 | 0.8905 | 0.1298 | 0.0270 | 0.0259 |
+
+Interpretation:
+
+- The same pattern shows up on more replay-like browser traces.
+- Coarse actions compress best, but the resulting chunks are generic:
+  - `CLICK -> CLICK`
+  - `GOTO -> CLICK`
+  - `CLICK -> COPY`
+- `coarse_signature` is again the best middle ground:
+  - it keeps useful routines like `CLICK(text) -> COPY(text)` and `OPEN_TAB -> SWITCH_TAB`
+  - but it avoids most of the vocabulary explosion of raw signatures
+- Richer signatures surface better routines:
+  - `OPEN_TAB -> SWITCH_TAB`
+  - `SCROLL -> CLICK(div)`
+  - `CLICK(textarea) -> PASTE`
+- But those richer tokens still hurt simple cache accuracy.
+
+### What this means
+
+The project is still on track, but the target is now sharper.
+
+What looks promising:
+
+- public datasets are enough to keep making progress
+- repeated browser routines definitely exist
+- richer replay data like WebLINX BrowserGym is already useful
+- coarse semantic target abstraction is a real improvement over raw signatures
+
+What looks unlikely to work:
+
+- plain BPE over brittle target signatures
+- using raw selectors or labels as-is and expecting good transfer
+- claiming success from compression alone
+
+## Updated next steps
+
+The next work should be:
+
+1. Improve `coarse_signature` instead of adding more raw tokenizers
+   Examples:
+   better role families, result-card detection, primary-action detection, modal controls
+
+2. Add **page-state context** to the cache key instead of only previous actions
+   Examples:
+   URL pattern, form step, result-list page, detail page
+
+3. Keep raw-ish replay data in the loop
+   WebLINX BrowserGym stays useful even without raw Mind2Web traces.
+
+4. Treat raw Mind2Web `trace.zip` as a later upgrade
+   Useful for finer timing and Playwright-level replay, but no longer needed to answer the current question.
 
 ### Experiment 2: macro quality by source
 

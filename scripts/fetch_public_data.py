@@ -46,12 +46,14 @@ WEBLINX_VALID_DEMO_IDS_30 = [
     "fzcutlb",
     "gmhajlo",
 ]
+MIND2WEB_TRAIN_FILES = [f"data/train/train_{index}.json" for index in range(11)]
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Fetch the small public dataset slices used in this repo.")
     parser.add_argument("--all", action="store_true", help="Fetch the standard local bundle used by the current experiments.")
     parser.add_argument("--mind2web-train10", action="store_true", help="Fetch Mind2Web data/train/train_10.json.")
+    parser.add_argument("--mind2web-all-train", action="store_true", help="Fetch all public Mind2Web training shards (train_0.json through train_10.json).")
     parser.add_argument("--weblinx-valid-chat", action="store_true", help="Fetch WebLINX data/chat/valid.json.gz.")
     parser.add_argument("--weblinx-browsergym-replays", type=int, default=0, help="Fetch replay.json, metadata.json, and form.json for the first N demo ids in the bundled replay list.")
     parser.add_argument("--weblinx-browsergym-full-demo", default="", help="Fetch and unzip one full BrowserGym demo zip by id, e.g. apfyesq.")
@@ -71,6 +73,11 @@ def download_file(repo_id: str, filename: str, local_dir: str) -> str:
 
 def fetch_mind2web_train10() -> None:
     download_file("osunlp/Mind2Web", "data/train/train_10.json", "data/local/mind2web")
+
+
+def fetch_mind2web_all_train() -> None:
+    for filename in MIND2WEB_TRAIN_FILES:
+        download_file("osunlp/Mind2Web", filename, "data/local/mind2web")
 
 
 def fetch_weblinx_valid_chat() -> None:
@@ -115,6 +122,8 @@ def main() -> None:
 
     if args.mind2web_train10:
         fetch_mind2web_train10()
+    if args.mind2web_all_train:
+        fetch_mind2web_all_train()
     if args.weblinx_valid_chat:
         fetch_weblinx_valid_chat()
     if args.weblinx_browsergym_replays:

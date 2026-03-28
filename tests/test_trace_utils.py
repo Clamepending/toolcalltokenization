@@ -4,6 +4,7 @@ import unittest
 from toolcalltokenization.trace_utils import (
     apply_bpe_tokens,
     apply_macros,
+    CANONICALIZATION_MODES,
     canonicalize_event,
     compress_sequence,
     evaluate_next_token_cache,
@@ -14,6 +15,12 @@ from toolcalltokenization.trace_utils import (
 
 
 class TraceUtilsTest(unittest.TestCase):
+    def test_canonicalization_modes_are_explicit(self) -> None:
+        self.assertEqual(
+            CANONICALIZATION_MODES,
+            ("name_only", "value_slots", "coarse_signature", "target_signature", "signature"),
+        )
+
     def test_canonicalize_type_uses_slot(self) -> None:
         event = canonicalize_event(
             {
@@ -28,6 +35,54 @@ class TraceUtilsTest(unittest.TestCase):
             event["canonical_action"],
             "TYPE|role=input|label=search|value=<SEARCH_TERM>",
         )
+
+    def test_canonicalize_name_only_drops_args(self) -> None:
+        event = canonicalize_event(
+            {
+                "action_type": "type",
+                "target_role": "input",
+                "target_label": "Search",
+                "value": "cheap flights to seattle",
+            },
+            mode="name_only",
+        )
+        self.assertEqual(event["canonical_action"], "TYPE")
+
+    def test_canonicalize_value_slots_keeps_slot_but_not_target(self) -> None:
+        event = canonicalize_event(
+            {
+                "action_type": "type",
+                "target_role": "input",
+                "target_label": "Search",
+                "value": "cheap flights to seattle",
+                "slot": "search_term",
+            },
+            mode="value_slots",
+        )
+        self.assertEqual(event["canonical_action"], "TYPE|value=<SEARCH_TERM>")
+
+    def test_canonicalize_target_signature_keeps_target_but_not_value(self) -> None:
+        event = canonicalize_event(
+            {
+                "action_type": "type",
+                "target_role": "input",
+                "target_label": "Search",
+                "value": "cheap flights to seattle",
+            },
+            mode="target_signature",
+        )
+        self.assertEqual(event["canonical_action"], "TYPE|role=input|label=search")
+
+    def test_canonicalize_coarse_signature_coarsens_target(self) -> None:
+        event = canonicalize_event(
+            {
+                "action_type": "click",
+                "target_role": "button",
+                "target_label": "Search for flights to Seattle",
+            },
+            mode="coarse_signature",
+        )
+        self.assertEqual(event["canonical_action"], "CLICK|role=button|label=search")
 
     def test_canonicalize_infers_slot_from_label(self) -> None:
         event = canonicalize_event(
