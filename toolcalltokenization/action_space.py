@@ -90,13 +90,23 @@ def macro_action_spec(entry: dict) -> dict:
         parameter_spec(binding_id, index)
         for index, binding_id in enumerate(entry.get("input_bindings", []))
     ]
+    trigger_prefix_len = int(entry.get("trigger_prefix_len", 1))
+    steps = list(entry.get("sequence", []))
     return {
         "name": entry["suggested_name"],
         "kind": "macro",
         "description": entry["suggested_description"],
         "parameters": parameters,
         "group_key": entry.get("group_key", "<all>"),
-        "steps": list(entry.get("sequence", [])),
+        "steps": steps,
+        "preconditions": {
+            "group_key": entry.get("group_key", "<all>"),
+            "site": entry.get("site"),
+            "task_family": entry.get("task_family"),
+            "required_inputs": list(entry.get("input_bindings", [])),
+            "trigger_prefix_len": trigger_prefix_len,
+            "trigger_prefix": steps[: min(trigger_prefix_len, len(steps))],
+        },
         "metadata": {
             "registry_id": entry.get("registry_id"),
             "macro_id": entry.get("macro_id"),

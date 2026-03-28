@@ -760,6 +760,10 @@ The current action-space export script is:
 
 - `scripts/export_action_space.py`
 
+The current macro-agent simulation script is:
+
+- `scripts/simulate_macro_agent.py`
+
 Promotion is now defined as:
 
 1. discover macros on train traces
@@ -805,6 +809,73 @@ This is the first point where the project has something that can be handed to a 
 - a combined action-space JSON
 
 The naming is still heuristic. A small LLM can now be used post-hoc to improve names and descriptions without changing the actual discovery or promotion criteria.
+
+### Exploratory macro-agent simulation
+
+We now have an offline replay-style macro-agent simulation:
+
+- a macro-aware agent may attempt a promoted macro
+- if the full macro does not match the held-out trace, the attempt fails
+- the agent then falls back to primitive control
+
+This is still optimistic in some ways and pessimistic in others, but it is a much better approximation than pure compression.
+
+Current Mind2Web result with the default exploratory registry:
+
+- evaluated groups: `171`
+- groups with macros available: `14`
+- attempted macro calls: `28`
+- successful macro calls: `18`
+- failed macro calls: `10`
+- macro success rate: `0.6429`
+- primitive held-out steps: `1333`
+- macro-agent decisions: `1313`
+- net decision reduction: `1.5%`
+
+Interpretation:
+
+- the promoted macros are genuinely usable in some groups
+- but coverage is still small
+- failed macro attempts eat into the compression gains quickly
+
+This is the first result that really matters for a future online agent:
+
+- discovery and replay alone looked stronger
+- once failed attempts are priced in, the net gain is smaller
+- so trigger precision and coverage are now the central bottlenecks
+
+### Promotion-threshold sweep
+
+We also ran a small exploratory sweep over registry strictness.
+
+Default exploratory registry:
+
+- `15` promoted macros
+- `14` parameterized
+- `20` net saved decisions
+- `0.6429` macro success rate
+
+Stricter registry with held-out replay precision `>= 0.5`:
+
+- `12` promoted macros
+- `12` parameterized
+- `15` net saved decisions
+- `0.8667` macro success rate
+- only `2` failed macro attempts
+
+Interpretation:
+
+- a looser registry gives slightly more total savings
+- a stricter registry is much cleaner and much safer
+- this suggests a real agent should probably support more than one promotion tier:
+  - a high-confidence tier for automatic macro use
+  - a broader exploratory tier for ablation studies or assisted selection
+
+This threshold tradeoff is a promising result rather than a failure.
+It means the current bottleneck is no longer “can we find any macros?” but:
+
+- how should we trade off coverage and precision?
+- what preconditions or page-state checks let us recover coverage without paying so many failed attempts?
 
 ### Savings and replay metrics
 

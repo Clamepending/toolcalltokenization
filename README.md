@@ -111,6 +111,14 @@ python3 scripts/promote_macros.py \
 python3 scripts/export_action_space.py \
   --registry outputs/mind2web_site_task_family_macro_registry.json \
   --output outputs/mind2web_site_task_family_action_space.json
+
+python3 scripts/simulate_macro_agent.py \
+  --input outputs/mind2web_full_train.jsonl \
+  --registry outputs/mind2web_site_task_family_macro_registry.json \
+  --output outputs/mind2web_site_task_family_macro_agent_sim.json \
+  --canonicalization-mode dataflow_coarse \
+  --group-by website_task_family \
+  --min-group-episodes 3
 ```
 
 To sweep action representations instead of using just one canonical form, rerun
@@ -144,6 +152,7 @@ To measure utility instead of just discovery:
 - use `macro_replay_eval.py` for held-out exact replay precision
 - use `promote_macros.py` to turn held-out-approved macros into a registry
 - use `export_action_space.py` to combine primitives plus promoted macros into one action vocabulary
+- use `simulate_macro_agent.py` to estimate what a macro-aware agent would save once failed macro attempts and primitive fallback are included
 
 The current savings numbers are still **decision-side estimates**, not real browser wall-clock timings. Real wall-clock measurements will need a controlled online benchmark.
 
@@ -154,6 +163,8 @@ Current best public-data finding:
 - parameterized replay precision rises from `0.129` to `0.1916`
 - the first promoted registry contains `15` candidate macros, `14` of them parameterized
 - the exported pilot action space contains `24` total actions: `9` primitives + `15` macros
+- the first macro-agent simulation saves `20` decisions over `1333` held-out primitive steps, about `1.5%`, with a `0.6429` macro success rate
+- a stricter registry with replay precision `>= 0.5` saves fewer decisions (`15`) but improves macro success rate to `0.8667`
 
 ## Why this starts offline
 

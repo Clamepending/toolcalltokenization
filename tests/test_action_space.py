@@ -28,6 +28,8 @@ class ActionSpaceTest(unittest.TestCase):
         self.assertEqual(action["name"], "newegg_search_m003")
         self.assertEqual(action["parameters"][0]["binding_id"], "B01")
         self.assertEqual(action["metadata"]["support"], 7)
+        self.assertEqual(action["preconditions"]["group_key"], "newegg::search")
+        self.assertEqual(action["preconditions"]["trigger_prefix"], ["TYPE|role=input|label=search|use=B01"])
 
     def test_build_action_space_combines_primitives_and_macros(self) -> None:
         payload = build_action_space(
