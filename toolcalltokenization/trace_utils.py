@@ -1,0 +1,252 @@
+from __future__ import annotations
+
+from collections import Counter, defaultdict
+from pathlib import Path
+from typing import Dict, Iterable, List, Sequence, Tuple
+from urllib.parse import urlsplit
+import json
+import re
+
+
+SHORT_TEXT_MAX_LEN = 24
+SHORT_TEXT_MAX_WORDS = 3
+TEXT_KEYS = ("value", "text", "query", "search", "input")
+LABEL_KEYS = ("target_text", "target_label", "label", "name")
+ROLE_KEYS = ("target_role", "role")
+SELECTOR_KEYS = ("selector", "target_selector")
+SLOT_KEYS = ("slot", "value_slot")
+
+
+def load_jsonl(path: str) -> List[dict]:
+    rows: List[dict] = []
+    with open(path, "r", encoding="utf-8") as handle:
+        for line in handle:
+            line = line.strip()
+            if not line:
+                continue
+            rows.append(json.loads(line))
+    return rows
+
+
+def dump_jsonl(path: str, rows: Iterable[dict]) -> None:
+    output_path = Path(path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(output_path, "w", encoding="utf-8") as handle:
+        for row in rows:
+            handle.write(json.dumps(row, sort_keys=True) + "\n")
+
+
+def dump_json(path: str, payload: object) -> None:
+    output_path = Path(path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(output_path, "w", encoding="utf-8") as handle:
+        json.dump(payload, handle, indent=2, sort_keys=True)
+        handle.write("\n")
+
+
+def normalize_whitespace(value: str) -> str:
+    return re.sub(r"\s+", " ", value.strip())
+
+
+def normalize_url(value: str) -> str:
+    if not value:
+        return "<ROOT>"
+    parsed = urlsplit(value)
+    path = parsed.path or "/"
+    if parsed.query:
+        return f"{path}?<QUERY>"
+    return path
+
+
+def placeholder_for_value(value: str) -> str:
+    normalized = normalize_whitespace(value)
+    if not normalized:
+        return "<EMPTY>"
+    if re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", normalized):
+        return "<EMAIL>"
+    if re.fullmatch(r"\d{4}-\d{2}-\d{2}", normalized):
+        return "<DATE>"
+    if re.fullmatch(r"\d{1,2}:\d{2}", normalized):
+        return "<TIME>"
+    if re.fullmatch(r"\d+(\.\d+)?", normalized):
+        return "<NUMBER>"
+    return "<TEXT>"
+
+
+def normalize_text_label(value: str) -> str:
+    normalized = normalize_whitespace(value).lower()
+    if not normalized:
+        return ""
+    if len(normalized) <= SHORT_TEXT_MAX_LEN and len(normalized.split()) <= SHORT_TEXT_MAX_WORDS:
+        return normalized
+    return placeholder_for_value(normalized)
+
+
+def pick_first(row: dict, keys: Sequence[str]) -> str:
+    for key in keys:
+        value = row.get(key)
+        if value is None:
+            continue
+        string_value = str(value).strip()
+        if string_value:
+            return string_value
+    return ""
+
+
+def canonicalize_event(row: dict) -> dict:
+    event = dict(row)
+    action_type = str(event.get("action_type", "unknown")).strip().upper()
+    role = normalize_text_label(pick_first(event, ROLE_KEYS))
+    label = normalize_text_label(pick_first(event, LABEL_KEYS))
+    selector = normalize_text_label(pick_first(event, SELECTOR_KEYS))
+    slot = normalize_text_label(pick_first(event, SLOT_KEYS)).upper()
+    value = pick_first(event, TEXT_KEYS)
+    parts = [action_type]
+
+    if action_type == "GOTO":
+        parts.append(f"url={normalize_url(str(event.get('url', '')))}")
+    else:
+        if role:
+            parts.append(f"role={role}")
+        if label:
+            parts.append(f"label={label}")
+        elif selector:
+            parts.append(f"selector={selector}")
+        if value:
+            if slot:
+                parts.append(f"value=<{slot}>")
+            else:
+                parts.append(f"value={placeholder_for_value(value)}")
+
+    event["canonical_action"] = "|".join(parts)
+    return event
+
+
+def group_sequences(rows: Iterable[dict]) -> Dict[str, List[str]]:
+    grouped: Dict[str, List[Tuple[int, str]]] = defaultdict(list)
+    for row in rows:
+        episode_id = str(row.get("episode_id", "unknown"))
+        step_index = int(row.get("step_index", 0))
+        action = str(row.get("canonical_action", "")).strip()
+        if action:
+            grouped[episode_id].append((step_index, action))
+    return {
+        episode_id: [action for _, action in sorted(events)]
+        for episode_id, events in grouped.items()
+    }
+
+
+def mine_frequent_chunks(
+    sequences: Dict[str, List[str]],
+    min_support: int = 2,
+    max_chunk_len: int = 4,
+    top_k: int = 50,
+) -> List[dict]:
+    support_sets: Dict[Tuple[str, ...], set] = defaultdict(set)
+    occurrence_counts: Counter = Counter()
+
+    for episode_id, sequence in sequences.items():
+        for chunk_len in range(2, max_chunk_len + 1):
+            if len(sequence) < chunk_len:
+                continue
+            seen_in_episode = set()
+            for start in range(len(sequence) - chunk_len + 1):
+                chunk = tuple(sequence[start : start + chunk_len])
+                occurrence_counts[chunk] += 1
+                seen_in_episode.add(chunk)
+            for chunk in seen_in_episode:
+                support_sets[chunk].add(episode_id)
+
+    candidates = []
+    for chunk, episodes in support_sets.items():
+        support = len(episodes)
+        if support < min_support:
+            continue
+        candidates.append(
+            {
+                "sequence": list(chunk),
+                "length": len(chunk),
+                "support": support,
+                "occurrences": occurrence_counts[chunk],
+            }
+        )
+
+    candidates.sort(
+        key=lambda item: (
+            -item["support"],
+            -item["length"],
+            -item["occurrences"],
+            item["sequence"],
+        )
+    )
+
+    trimmed = candidates[:top_k]
+    for index, macro in enumerate(trimmed, start=1):
+        macro["macro_id"] = f"M{index:03d}"
+    return trimmed
+
+
+def compress_sequence(sequence: Sequence[str], macros: Sequence[dict]) -> Tuple[List[str], Counter]:
+    ordered_macros = sorted(
+        macros,
+        key=lambda macro: (-len(macro["sequence"]), -macro.get("support", 0), macro["macro_id"]),
+    )
+    compressed: List[str] = []
+    hits: Counter = Counter()
+    index = 0
+
+    while index < len(sequence):
+        matched = False
+        for macro in ordered_macros:
+            chunk = macro["sequence"]
+            chunk_len = len(chunk)
+            if list(sequence[index : index + chunk_len]) == list(chunk):
+                compressed.append(f"MACRO:{macro['macro_id']}")
+                hits[macro["macro_id"]] += 1
+                index += chunk_len
+                matched = True
+                break
+        if matched:
+            continue
+        compressed.append(sequence[index])
+        index += 1
+
+    return compressed, hits
+
+
+def compression_summary(sequences: Dict[str, List[str]], macros: Sequence[dict]) -> dict:
+    episodes = []
+    total_primitive = 0
+    total_compressed = 0
+    macro_hits: Counter = Counter()
+
+    for episode_id, sequence in sorted(sequences.items()):
+        compressed, hits = compress_sequence(sequence, macros)
+        primitive_len = len(sequence)
+        compressed_len = len(compressed)
+        total_primitive += primitive_len
+        total_compressed += compressed_len
+        macro_hits.update(hits)
+        episodes.append(
+            {
+                "episode_id": episode_id,
+                "primitive_steps": primitive_len,
+                "compressed_steps": compressed_len,
+                "compression_ratio": round(compressed_len / primitive_len, 4) if primitive_len else 0.0,
+                "macro_hits": dict(hits),
+                "sequence": list(sequence),
+                "compressed_sequence": compressed,
+            }
+        )
+
+    return {
+        "summary": {
+            "episodes": len(episodes),
+            "primitive_steps": total_primitive,
+            "compressed_steps": total_compressed,
+            "compression_ratio": round(total_compressed / total_primitive, 4) if total_primitive else 0.0,
+            "episodes_with_macro_use": sum(1 for item in episodes if item["macro_hits"]),
+        },
+        "macro_hits": dict(macro_hits),
+        "episodes": episodes,
+    }

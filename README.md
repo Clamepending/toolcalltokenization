@@ -1,22 +1,51 @@
 # toolcalltokenization
 
-Research notes and experimental planning for learning reusable browser-agent or tool-call action chunks from traces.
+Small experiments for learning reusable browser-agent or tool-call action chunks from traces.
 
 ## Contents
 
-- [Browser-agent tool tokenization report](./browser-agent-tool-tokenization-report.md)
+- [Project plan](./report.md)
+- [Literature review](./browser-agent-tool-tokenization-report.md)
 
 ## Focus
 
-This repo currently contains:
+This repo now has:
 
-- a literature review of browser-agent trace datasets and tool-use benchmarks
-- a proposal for BPE-style or slot-aware action-chunk mining
-- a concrete study design for measuring speed, accuracy, and cost
+- a short project plan in `report.md`
+- a longer literature review in `browser-agent-tool-tokenization-report.md`
+- a minimal offline harness for:
+  - canonicalizing traces
+  - mining repeated action chunks
+  - measuring simple compression from those chunks
 
-## Next likely steps
+## Minimal harness
 
-- define a canonical trace schema
-- build an offline macro miner
-- integrate a hybrid primitive+macro agent with BrowserGym / AgentLab
-- run controlled evaluations on WorkArena, WebArena, and VisualWebArena
+The first harness is intentionally small:
+
+- input JSONL traces
+- normalize them into canonical action strings
+- mine frequent multi-step chunks
+- measure how much those chunks compress trajectories
+
+## Quickstart
+
+```bash
+python3 scripts/prepare_traces.py \
+  --input data/demo/sample_trace.jsonl \
+  --output outputs/demo/canonical_trace.jsonl
+
+python3 scripts/mine_macros.py \
+  --input outputs/demo/canonical_trace.jsonl \
+  --output outputs/demo/macros.json
+
+python3 scripts/evaluate_macros.py \
+  --input outputs/demo/canonical_trace.jsonl \
+  --macros outputs/demo/macros.json \
+  --output outputs/demo/eval.json
+```
+
+## Why this starts offline
+
+- it keeps the repo simple
+- it lets us test trace compressibility before building a full browser runtime
+- it gives us a stable format that later BrowserGym or Playwright adapters can target

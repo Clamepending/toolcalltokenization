@@ -1,0 +1,15 @@
+{"action_type":"goto","episode_id":"episode-1","step_index":0,"url":"https://example.com/search"}
+{"action_type":"click","episode_id":"episode-1","step_index":1,"target_label":"Search","target_role":"input"}
+{"action_type":"type","episode_id":"episode-1","slot":"search_term","step_index":2,"target_label":"Search","target_role":"input","value":"cheap flights to seattle"}
+{"action_type":"click","episode_id":"episode-1","step_index":3,"target_role":"button","target_text":"Search"}
+{"action_type":"click","episode_id":"episode-1","step_index":4,"target_role":"link","target_text":"Flight deals"}
+{"action_type":"goto","episode_id":"episode-2","step_index":0,"url":"https://example.com/search"}
+{"action_type":"click","episode_id":"episode-2","step_index":1,"target_label":"Search","target_role":"input"}
+{"action_type":"type","episode_id":"episode-2","slot":"search_term","step_index":2,"target_label":"Search","target_role":"input","value":"cheap flights to portland"}
+{"action_type":"click","episode_id":"episode-2","step_index":3,"target_role":"button","target_text":"Search"}
+{"action_type":"click","episode_id":"episode-2","step_index":4,"target_role":"link","target_text":"Flight deals"}
+{"action_type":"goto","episode_id":"episode-3","step_index":0,"url":"https://example.com/search"}
+{"action_type":"click","episode_id":"episode-3","step_index":1,"target_label":"Search","target_role":"input"}
+{"action_type":"type","episode_id":"episode-3","slot":"search_term","step_index":2,"target_label":"Search","target_role":"input","value":"best pizza in oakland"}
+{"action_type":"click","episode_id":"episode-3","step_index":3,"target_role":"button","target_text":"Search"}
+{"action_type":"click","episode_id":"episode-3","step_index":4,"target_role":"link","target_text":"Top results"}
