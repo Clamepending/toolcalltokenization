@@ -75,6 +75,14 @@ class TraceUtilsTest(unittest.TestCase):
         compressed = apply_bpe_tokens(sequences, merges)
         self.assertEqual(compressed["a"][0], "BPE001")
 
+    def test_bpe_requires_cross_episode_support(self) -> None:
+        sequences = {
+            "a": ["X", "Y", "X", "Y"],
+            "b": ["A", "B"],
+        }
+        merges = train_bpe_tokens(sequences, num_merges=2, min_occurrences=2, min_support=2)
+        self.assertEqual(merges, [])
+
     def test_split_sequences_reserves_holdout(self) -> None:
         sequences = {
             "a": ["A", "B"],

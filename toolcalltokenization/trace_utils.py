@@ -219,6 +219,7 @@ def train_bpe_tokens(
     sequences: Dict[str, List[str]],
     num_merges: int = 25,
     min_occurrences: int = 2,
+    min_support: int = 2,
 ) -> List[dict]:
     token_expansions = {}
     current = {episode_id: list(sequence) for episode_id, sequence in sequences.items()}
@@ -245,8 +246,16 @@ def train_bpe_tokens(
         if not pair_counts:
             break
 
+        candidates = [
+            (pair, occurrences)
+            for pair, occurrences in pair_counts.items()
+            if occurrences >= min_occurrences and len(pair_support[pair]) >= min_support
+        ]
+        if not candidates:
+            break
+
         best_pair, occurrences = max(
-            pair_counts.items(),
+            candidates,
             key=lambda item: (
                 item[1],
                 len(pair_support[item[0]]),
@@ -254,8 +263,6 @@ def train_bpe_tokens(
                 item[0],
             ),
         )
-        if occurrences < min_occurrences:
-            break
 
         left, right = best_pair
         token_id = f"BPE{merge_index + 1:03d}"

@@ -72,4 +72,5 @@ Current converters target:
 
 - Mind2Web task JSON files
 - WebLINX `replay.json` demonstrations
+- WebLINX processed chat/action JSONL or JSONL.GZ files
 - WONDERBREAD-style `trace.json` files

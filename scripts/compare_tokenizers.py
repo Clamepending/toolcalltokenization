@@ -36,6 +36,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--min-support", type=int, default=2, help="Minimum episode support for a chunk.")
     parser.add_argument("--num-merges", type=int, default=25, help="Number of BPE merges to attempt.")
     parser.add_argument("--min-occurrences", type=int, default=2, help="Minimum pair occurrences for a BPE merge.")
+    parser.add_argument("--bpe-min-support", type=int, default=2, help="Minimum episode support for a BPE merge.")
     parser.add_argument("--train-ratio", type=float, default=1.0, help="Fraction of episodes to use for training tokenizers.")
     parser.add_argument("--seed", type=int, default=0, help="Random seed for the train/test split.")
     parser.add_argument("--context-len", type=int, default=1, help="Prefix length for next-token cache evaluation.")
@@ -65,6 +66,7 @@ def main() -> None:
         sequences,
         num_merges=args.num_merges,
         min_occurrences=args.min_occurrences,
+        min_support=args.bpe_min_support,
     )
     bpe_eval = bpe_summary(sequences, merges)
 
@@ -110,6 +112,7 @@ def main() -> None:
             train_sequences,
             num_merges=args.num_merges,
             min_occurrences=args.min_occurrences,
+            min_support=args.bpe_min_support,
         )
         primitive_cache = evaluate_next_token_cache(
             train_sequences,

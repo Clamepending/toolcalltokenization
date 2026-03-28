@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Iterable, List, Optional
+import gzip
 import json
+import re
 
 
 LABEL_ATTR_KEYS = (
@@ -17,6 +19,7 @@ LABEL_ATTR_KEYS = (
     "innerText",
     "option",
 )
+WEBLINX_FIELD_KEYS = ("tag", "text", "xpath", "bbox", "attributes", "children")
 
 
 def load_json(path: str) -> object:
@@ -57,6 +60,13 @@ def pick_label_from_attributes(attrs: dict) -> str:
     return ""
 
 
+def parse_html_like_attributes(raw: str) -> dict:
+    attrs = {}
+    for key, value in re.findall(r"([a-zA-Z0-9_:-]+)='([^']*)'", raw or ""):
+        attrs[key] = value
+    return attrs
+
+
 def choose_mind2web_target(action: dict) -> dict:
     candidates = action.get("pos_candidates", []) or []
     for candidate in candidates:
@@ -72,6 +82,17 @@ def iter_json_files(path: str) -> List[Path]:
     if root.is_file():
         return [root]
     return sorted(candidate for candidate in root.rglob("*.json") if candidate.is_file())
+
+
+def iter_data_files(path: str, suffixes: tuple = (".json", ".jsonl", ".gz")) -> List[Path]:
+    root = Path(path)
+    if root.is_file():
+        return [root]
+    return sorted(
+        candidate
+        for candidate in root.rglob("*")
+        if candidate.is_file() and candidate.suffix in suffixes
+    )
 
 
 def convert_mind2web(input_path: str) -> List[dict]:
@@ -178,6 +199,107 @@ def convert_weblinx_replay(input_path: str, include_chat: bool = False) -> List[
             )
             step_index += 1
     return events
+
+
+ACTION_PATTERN = re.compile(r"^(?P<name>[a-zA-Z_]+)\((?P<args>.*)\)$")
+ARG_PATTERN = re.compile(r'([a-zA-Z_]+)="((?:[^"\\\\]|\\\\.)*)"')
+
+
+def parse_action_string(action: str) -> tuple[str, dict]:
+    action = str(action).strip()
+    match = ACTION_PATTERN.match(action)
+    if not match:
+        return action.lower(), {}
+    name = match.group("name").lower()
+    args = {}
+    for key, value in ARG_PATTERN.findall(match.group("args")):
+        args[key] = bytes(value, "utf-8").decode("unicode_escape")
+    return name, args
+
+
+def parse_weblinx_candidate_blob(candidates: str, uid: str) -> dict:
+    if not candidates or not uid:
+        return {}
+    marker = f"(uid = {uid})"
+    start = candidates.find(marker)
+    if start < 0:
+        return {}
+    next_start = candidates.find("\n(uid = ", start + len(marker))
+    block = candidates[start: next_start if next_start >= 0 else len(candidates)]
+    result = {"uid": uid}
+    matches = list(re.finditer(r"\[\[([a-zA-Z]+)\]\]", block))
+    for index, match in enumerate(matches):
+        key = match.group(1).lower()
+        if key not in WEBLINX_FIELD_KEYS:
+            continue
+        value_start = match.end()
+        value_end = matches[index + 1].start() if index + 1 < len(matches) else len(block)
+        result[key] = block[value_start:value_end].strip()
+    attributes = parse_html_like_attributes(result.get("attributes", ""))
+    result["attributes_dict"] = attributes
+    return result
+
+
+def load_jsonl_records(path: Path) -> List[dict]:
+    opener = gzip.open if path.suffix == ".gz" else open
+    rows: List[dict] = []
+    with opener(path, "rt", encoding="utf-8") as handle:
+        for line in handle:
+            line = line.strip()
+            if not line:
+                continue
+            rows.append(json.loads(line))
+    return rows
+
+
+def convert_weblinx_chat(input_path: str) -> List[dict]:
+    files = [
+        candidate
+        for candidate in iter_data_files(input_path)
+        if candidate.name.endswith(".jsonl") or candidate.name.endswith(".json.gz") or candidate.name.endswith(".json")
+    ]
+    grouped = {}
+    for path in files:
+        for row in load_jsonl_records(path):
+            if not isinstance(row, dict) or "demo" not in row or "action" not in row:
+                continue
+            grouped.setdefault(str(row["demo"]), []).append((int(row.get("turn", 0)), row, path))
+
+    events: List[dict] = []
+    for demo_name, entries in sorted(grouped.items()):
+        for step_index, (turn, row, path) in enumerate(sorted(entries, key=lambda item: item[0])):
+            action_name, args = parse_action_string(row.get("action", ""))
+            candidate = parse_weblinx_candidate_blob(str(row.get("candidates", "")), str(args.get("uid", "")))
+            attributes = candidate.get("attributes_dict", {})
+            events.append(
+                {
+                    "source_dataset": "weblinx_chat",
+                    "episode_id": demo_name,
+                    "step_index": step_index,
+                    "benchmark": "weblinx_chat",
+                    "original_turn_index": turn,
+                    "action_type": map_weblinx_chat_action(action_name),
+                    "original_action_type": action_name,
+                    "url": args.get("url"),
+                    "selector": args.get("uid"),
+                    "target_role": candidate.get("tag"),
+                    "target_label": pick_label_from_attributes(attributes) or candidate.get("text"),
+                    "value": args.get("text") or args.get("utterance"),
+                    "speaker": args.get("speaker"),
+                    "candidate": candidate,
+                    "raw_action": row.get("action"),
+                    "source_file": str(path),
+                }
+            )
+    return events
+
+
+def map_weblinx_chat_action(action_name: str) -> str:
+    mapping = {
+        "text_input": "type",
+        "load": "goto",
+    }
+    return mapping.get(action_name, action_name).lower()
 
 
 def map_weblinx_intent(intent: Optional[str]) -> str:

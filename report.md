@@ -282,6 +282,72 @@ The next meaningful result is therefore not “more toy compression,” but:
 - compare in-sample vs held-out compression
 - compare primitive vs macro vs BPE cacheability on held-out episodes
 
+## Pilot findings on real WebLINX data
+
+We now have one real-data pilot using the downloadable `WebLINX` validation chat split, reconstructed into action sequences by `demo` and `turn`.
+
+### Full WebLINX chat-action slice
+
+Current converted sample:
+
+- 100 episodes
+- 2,126 actions
+- action mix dominated by `click`, `say`, and `scroll`
+
+Observed results:
+
+- in-sample frequent-chunk compression: `1848 / 2126`, ratio `0.8692`
+- in-sample BPE compression after support filtering: `1852 / 2126`, ratio `0.8711`
+- held-out frequent-chunk compression on test episodes: `415 / 477`, ratio `0.87`
+- held-out BPE compression on test episodes: `419 / 477`, ratio `0.8784`
+
+Cacheability result on held-out episodes with a 1-token prefix cache:
+
+- primitive overall accuracy: `0.1554`
+- frequent-chunk overall accuracy: `0.0253`
+- BPE overall accuracy: `0.0226`
+
+Interpretation:
+
+- The split is heavily influenced by dialogue turns.
+- The learned chunks mostly collapse repeated `say` and `scroll` behavior.
+- Compression exists, but tokenization does **not** improve simple next-action caching in this representation.
+
+### Browser-only WebLINX slice
+
+If we drop `say` actions from the converted WebLINX split:
+
+- 100 episodes
+- 1,538 actions
+
+Observed results:
+
+- in-sample frequent-chunk compression: `1463 / 1538`, ratio `0.9512`
+- in-sample BPE compression: `1467 / 1538`, ratio `0.9538`
+- held-out frequent-chunk compression: `338 / 343`, ratio `0.9854`
+- held-out BPE compression: `339 / 343`, ratio `0.9883`
+
+Cacheability result on held-out episodes with a 1-token prefix cache:
+
+- primitive overall accuracy: `0.0464`
+- frequent-chunk overall accuracy: `0.0314`
+- BPE overall accuracy: `0.0313`
+
+Interpretation:
+
+- Once dialogue is removed, compression becomes much weaker.
+- The remaining representation is still too selector-heavy and not abstract enough.
+- Better semantic canonicalization helps a bit, but not enough.
+
+### Practical conclusion from the pilot
+
+This is a strong signal that:
+
+1. **Processed WebLINX chat data is not the ideal primary source** for browser macro discovery.
+2. **Raw replay traces or BrowserGym-style traces are still the better target** for the main study.
+3. **Canonicalization quality dominates results.** If actions are mostly opaque selectors, useful chunks do not transfer.
+4. **BPE should require cross-episode support by default.** Without that, it overfits repeated patterns inside a single episode.
+
 ## Trace format
 
 Each event should be a single JSON object with simple fields like:
