@@ -905,6 +905,115 @@ It means the current bottleneck is no longer “can we find any macros?” but:
 - how should we trade off coverage and precision?
 - what extra page-state checks let us recover coverage now that trigger-prefix matching is no longer the main problem?
 
+### Current decisions and reasoning
+
+At this point, the main project decisions are:
+
+1. **Keep offline discovery centered on `website_task_family` and `dataflow_coarse`.**
+   Reason:
+   This is still the cleanest setting for surfacing function-like browser workflows with anonymous arguments.
+
+2. **Use stronger preconditions rather than looser triggering.**
+   Reason:
+   The move from a `1`-step to a `2`-step trigger prefix was a larger win than tightening the replay threshold alone.
+
+3. **Treat the current bottleneck as a coverage problem.**
+   Reason:
+   Inside the groups we cover, the macro policy already saves about `14.6%` of decisions.
+   The global gain stays small because the promoted registry only covers about `13.9%` of held-out primitive steps.
+
+4. **Use two browser harnesses rather than one.**
+   Reason:
+   The project has two different runtime needs:
+   - custom real-site collection and macro debugging
+   - reproducible benchmark evaluation
+
+### Browser harness decision
+
+The current runtime plan is:
+
+1. **Custom Playwright harness for collection, debugging, and live-site pilots**
+   Use this for:
+   - Amazon / United / Yelp / Newegg style traces
+   - macro expansion debugging
+   - Playwright trace capture
+   - labeling macro attempts and failures in browser traces
+
+   Why:
+   - simplest way to execute our primitive action API directly
+   - easiest place to add macro expansion and fallback
+   - best fit for collecting more repeated traces on chosen sites
+
+2. **BrowserGym + AgentLab + WorkArena-L1 for benchmarked evaluation**
+   Use this for:
+   - reproducible primitive-only vs macro-aware comparisons
+   - task success, benchmark score, cost, latency, and invalid-action rate
+
+   Why:
+   - better benchmark discipline
+   - easier to compare against existing browser-agent baselines
+   - better choice for “results we would present upward”
+
+So the current reasoning is:
+
+- **Playwright** is the right first live harness
+- **BrowserGym / AgentLab / WorkArena-L1** is the right first benchmark harness
+
+This split keeps the implementation simple while still preserving a path to rigorous evaluation.
+
+### First Playwright harness progress
+
+We now have the first minimal Playwright runtime scaffold in the repo:
+
+- `toolcalltokenization/playwright_harness.py`
+- `scripts/run_playwright_action.py`
+
+What it currently does:
+
+- loads the exported action space
+- executes one primitive or macro action
+- binds macro arguments like `B01`, `B02`
+- resolves coarse role / label targets into Playwright locators
+- checks simple preconditions before execution
+- records a Playwright trace when requested
+
+This is intentionally small and only supports the lowest-friction runtime path first.
+
+Current smoke-test result:
+
+- the promoted macro `newegg_search_m003` executes successfully on the local demo page
+- the harness fills the search box and clicks the search button
+- the run produces a Playwright trace at `outputs/demo_playwright_trace.zip`
+
+We also ran a small live-site sanity check with the same macro:
+
+- `https://www.wikipedia.org/`
+- `https://duckduckgo.com/`
+
+Both runs succeeded after one practical locator fix:
+
+- for `role=input|label=search`, the first harness version sometimes resolved to a labeled form container instead of an editable text box
+- we fixed this by preferring explicit input / textarea attribute matches and textbox/searchbox roles before falling back to `get_by_label`
+
+This is a meaningful result because it shows:
+
+- the current coarse role/label representation is already executable on at least some real sites
+- the runtime bottlenecks are now about locator robustness and page-state handling, not only offline mining
+- real browser execution is already surfacing useful implementation bugs
+
+This is not yet a benchmark result, but it does matter because it proves:
+
+- the promoted macro representation can be turned into executable browser actions
+- the current action-space JSON is already usable as a runtime artifact
+- the project has crossed from pure offline analysis into real browser execution
+
+What is still missing before the first serious online experiment:
+
+- a multi-step episode runner instead of one-off action execution
+- richer page-state preconditions
+- automatic primitive fallback and recovery inside a live browser episode
+- BrowserGym / AgentLab benchmark integration
+
 ### Savings and replay metrics
 
 We now have two small evaluation scripts:

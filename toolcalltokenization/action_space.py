@@ -76,6 +76,11 @@ def load_registry(path: str) -> dict:
         return json.load(handle)
 
 
+def load_action_space(path: str) -> dict:
+    with open(path, "r", encoding="utf-8") as handle:
+        return json.load(handle)
+
+
 def parameter_spec(binding_id: str, index: int) -> dict:
     return {
         "name": f"arg{index + 1}",

@@ -118,6 +118,14 @@ python3 scripts/simulate_macro_agent.py \
   --canonicalization-mode dataflow_coarse \
   --group-by website_task_family \
   --min-group-episodes 3
+
+./.venv/bin/python scripts/run_playwright_action.py \
+  --action-space outputs/mind2web_site_task_family_action_space.json \
+  --action newegg_search_m003 \
+  --start-file data/demo/search_form.html \
+  --arg arg1=laptop \
+  --trace outputs/demo_playwright_trace.zip \
+  --headless
 ```
 
 To sweep action representations instead of using just one canonical form, rerun
@@ -152,6 +160,7 @@ To measure utility instead of just discovery:
 - use `promote_macros.py` to turn held-out-approved macros into a registry
 - use `export_action_space.py` to combine primitives plus promoted macros into one action vocabulary
 - use `simulate_macro_agent.py` to estimate what a macro-aware agent would save once failed macro attempts and primitive fallback are included
+- use `run_playwright_action.py` to execute one primitive or macro action in a real browser with Playwright tracing
 
 The current savings numbers are still **decision-side estimates**, not real browser wall-clock timings. Real wall-clock measurements will need a controlled online benchmark.
 
@@ -167,6 +176,8 @@ Current best public-data finding:
 - with the stronger 2-step trigger policy, the macro-agent simulation saves `27` decisions over `1333` held-out primitive steps, about `2.03%`
 - under that policy, macro success rate improves from `0.6429` to `0.8571` and failed attempts drop from `10` to `3`
 - the main remaining bottleneck is coverage: promoted macros only cover about `13.9%` of held-out primitive steps, although within covered groups they save about `14.6%` of decisions
+- the first live browser smoke test now works: the promoted `newegg_search_m003` macro runs on [search_form.html](/Users/mark/Desktop/projects/toolcalltokenization/data/demo/search_form.html) and produces [demo_playwright_trace.zip](/Users/mark/Desktop/projects/toolcalltokenization/outputs/demo_playwright_trace.zip)
+- the same macro also ran successfully on `wikipedia.org` and `duckduckgo.com` after tightening the input locator logic
 
 ## Why this starts offline
 
