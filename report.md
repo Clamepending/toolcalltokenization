@@ -126,6 +126,63 @@ This is the current core experiment because it isolates the real tradeoff:
 - coarse actions compress well but often collapse into generic junk
 - rich actions are more meaningful but fragment badly
 
+## What `coarse_signature` means in practice
+
+The easiest way to think about `coarse_signature` is:
+
+- keep the action name
+- keep a **coarse target class**
+- keep a **small semantic label vocabulary** when we can
+- keep value slots for typed inputs
+- drop brittle raw labels, selectors, and page-specific text
+
+Examples:
+
+| Raw-ish action | `signature` | `coarse_signature` | Why this is useful |
+| --- | --- | --- | --- |
+| click a button labeled "Search for flights to Seattle" | `CLICK|role=button|label=<TEXT>` or a longer page-specific label | `CLICK|role=button|label=search` | keeps the intent but removes page-specific wording |
+| type `person@example.com` into Email | `TYPE|role=input|label=email|value=<EMAIL>` | `TYPE|role=input|label=email|value=<EMAIL>` | already stable, so we keep it |
+| click a search-result title in an `h3` | `CLICK|role=h3|label=<TEXT>` | `CLICK|role=text|label=<TEXT>` | groups many content-title clicks together |
+| click a product link | `CLICK|role=a|label=<TEXT>` | `CLICK|role=link|label=<TEXT>` | normalizes many link variants |
+| click a paragraph then copy it | `CLICK|role=p|label=<TEXT>` then `COPY|role=p|label=<TEXT>` | `CLICK|role=text|label=<TEXT>` then `COPY|role=text|label=<TEXT>` | turns tag-specific noise into a reusable reading/copy routine |
+| type "Seattle" into "City or Airport" | `TYPE|role=input|label=city or airport|value=<CITY>` | `TYPE|role=input|label=city|value=<CITY>` | keeps the semantic slot and simplifies the field label |
+| go to `https://example.com/search?q=flights` | `GOTO|url=/search?<QUERY>` | `GOTO|url=/search?<QUERY>` | URL normalization is already coarse enough |
+
+So `coarse_signature` is not meant to be the final abstraction. It is a cheap approximation to the thing we really want:
+
+- `search_box`
+- `primary_button`
+- `result_card`
+- `tab_switch`
+- `copyable_text`
+
+Right now it is the first representation that is coarse enough to reuse, but still structured enough to be more than `CLICK`.
+
+## Clarifying the real objective
+
+The real goal is **not** just to do BPE over browser traces.
+
+The real goal is to discover units that can become:
+
+1. **tokens**
+   A shorter symbol sequence for modeling, caching, and planning.
+
+2. **macros**
+   A reusable chunk that expands to primitive actions.
+
+3. **functions**
+   A callable browser routine with parameters, preconditions, and expected effects.
+
+That means a useful discovered unit should ideally have:
+
+- repeated support across many episodes
+- a clear parameterization pattern such as `<SEARCH_TERM>` or `<CITY>`
+- a stable trigger condition
+- a recognizable target state or page context
+- a predictable outcome after expansion
+
+Compression helps, but compression alone is not the finish line. A chunk like `CLICK -> CLICK -> CLICK` compresses well and is easy to cache, but it is not yet a good function.
+
 ## What we hope to see in the traces
 
 If this project is viable, traces should show a few clear patterns.
@@ -228,6 +285,194 @@ Success condition:
 - we find readable, repeated routines and get non-trivial compression
 - held-out compression remains useful when macros are learned on train and applied to test
 - tokenized traces are at least as cacheable as primitive traces on held-out episodes
+
+## What we should measure for workflow-sized functions
+
+If the end goal is executable workflow chunks, we should measure more than compression.
+
+### 1. Discovery quality
+
+These tell us whether a chunk is a serious macro candidate.
+
+- support across episodes
+- support across websites or tasks, not just one page
+- average primitive span length
+- number of distinct slot instantiations
+- held-out reuse rate
+- readability / semantic coherence of the top macros
+
+Expected outcome:
+
+- `name_only` should score high on support and reuse, but low on semantic quality
+- `signature` should score higher on interpretability, but lower on support
+- `coarse_signature` should be the best middle ground
+
+### 2. Parameterization quality
+
+These tell us whether a chunk is really a function rather than a memorized trace.
+
+- how often the same chunk appears with different values
+- how often slot names are stable across episodes
+- whether the same chunk works with `<CITY>`, `<DATE>`, `<EMAIL>`, and other slots
+- whether a chunk can be represented as a template plus arguments
+
+Expected outcome:
+
+- the best function candidates will be routines like:
+  - click input -> type slot value -> click search
+  - click edit -> type field value -> click save
+  - click text -> copy text
+
+### 3. Trigger quality
+
+These tell us whether an agent could safely choose the macro at runtime.
+
+- precision of matching a macro trigger on held-out traces
+- recall of macro opportunities on held-out traces
+- false-trigger rate
+- ambiguity rate when multiple macros could match
+
+Expected outcome:
+
+- pure previous-action matching will be too weak
+- adding page state like URL pattern or page-type context should help a lot
+
+### 4. Expansion / replay quality
+
+These tell us whether the macro is actually executable.
+
+- primitive expansion exact-match rate on held-out traces
+- completion rate after expansion
+- number of interruptions, retries, or branch mismatches during replay
+- sensitivity to small DOM variation
+
+Expected outcome:
+
+- coarse semantic macros should replay better than raw selector-based macros
+- fully generic chunks will replay often but may not accomplish meaningful work
+
+### 5. Agent-level utility
+
+These are the metrics that matter if the macros become actual agent functions.
+
+- task success
+- turns per successful task
+- output tokens per successful task
+- wall-clock latency
+- API cost
+- recovery overhead when a macro fails and the agent falls back to primitive actions
+
+Expected outcome:
+
+- the first gains should show up in turns, latency, and cost
+- success should stay flat or slightly improve on repetitive tasks
+- exploratory tasks may not benefit much
+
+## The experiments that matter most next
+
+### Experiment A: representation sweep
+
+Compare:
+
+- `name_only`
+- `value_slots`
+- `coarse_signature`
+- `target_signature`
+- `signature`
+
+Measure:
+
+- vocabulary size
+- held-out compression
+- cache coverage
+- cache accuracy
+- top macro readability
+
+Expected outcome:
+
+- already mostly confirmed
+- `coarse_signature` should stay the best public-data baseline
+
+### Experiment B: macro parameterization study
+
+Take the top mined macros and ask:
+
+- can they be written as templates with arguments?
+- how many slots do they expose?
+- how many distinct instantiations exist?
+
+Measure:
+
+- slot count per macro
+- distinct argument values per macro
+- support after slot abstraction
+
+Expected outcome:
+
+- many useful macros will collapse into a small number of templates with slots
+
+### Experiment C: state-conditioned macro triggering
+
+Instead of conditioning only on previous actions, condition on:
+
+- previous actions
+- URL pattern
+- page type
+- maybe a coarse DOM sketch
+
+Measure:
+
+- trigger precision
+- trigger recall
+- macro selection accuracy
+
+Expected outcome:
+
+- this should matter more than adding more BPE merges
+- it is the likely path to turning macros into reliable callable functions
+
+### Experiment D: replay-constrained macro execution
+
+On replayable traces or controlled benchmarks, let the agent choose a macro and expand it.
+
+Measure:
+
+- expansion success
+- fallback frequency
+- task success
+- turns saved
+- latency saved
+
+Expected outcome:
+
+- short 2-5 step macros should work first
+- long macros will likely need stronger state checks and interruption handling
+
+### Experiment E: controlled online benchmark
+
+Compare:
+
+- primitive-only agent
+- macro-aware agent with fallback
+
+Benchmarks:
+
+- WorkArena-L1 first
+- then WebArena
+- then VisualWebArena
+
+Measure:
+
+- success
+- turns
+- tokens
+- cost
+- latency
+
+Expected outcome:
+
+- early wins should appear on repetitive workflow tasks
+- the main benefit should be efficiency before it is raw capability
 
 ## Public-only workflow
 
