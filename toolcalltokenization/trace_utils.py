@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Dict, Iterable, List, Sequence, Tuple
 from urllib.parse import urlsplit
 import json
+import random
 import re
 
 
@@ -15,6 +16,22 @@ LABEL_KEYS = ("target_text", "target_label", "label", "name")
 ROLE_KEYS = ("target_role", "role")
 SELECTOR_KEYS = ("selector", "target_selector")
 SLOT_KEYS = ("slot", "value_slot")
+SLOT_HINTS = {
+    "search": "SEARCH_TERM",
+    "query": "SEARCH_TERM",
+    "city": "CITY",
+    "location": "LOCATION",
+    "destination": "DESTINATION",
+    "origin": "ORIGIN",
+    "email": "EMAIL",
+    "mail": "EMAIL",
+    "date": "DATE",
+    "time": "TIME",
+    "name": "NAME",
+    "phone": "PHONE",
+    "zip": "ZIP",
+    "postal": "ZIP",
+}
 
 
 def load_jsonl(path: str) -> List[dict]:
@@ -93,6 +110,17 @@ def pick_first(row: dict, keys: Sequence[str]) -> str:
     return ""
 
 
+def infer_slot_name(value: str, label: str) -> str:
+    direct = placeholder_for_value(value).strip("<>")
+    if direct not in {"TEXT", "EMPTY"}:
+        return direct
+    label_lower = normalize_text_label(label)
+    for hint, slot_name in SLOT_HINTS.items():
+        if hint in label_lower:
+            return slot_name
+    return ""
+
+
 def canonicalize_event(row: dict) -> dict:
     event = dict(row)
     action_type = str(event.get("action_type", "unknown")).strip().upper()
@@ -113,8 +141,9 @@ def canonicalize_event(row: dict) -> dict:
         elif selector:
             parts.append(f"selector={selector}")
         if value:
-            if slot:
-                parts.append(f"value=<{slot}>")
+            inferred_slot = slot or infer_slot_name(value, label)
+            if inferred_slot:
+                parts.append(f"value=<{inferred_slot}>")
             else:
                 parts.append(f"value={placeholder_for_value(value)}")
 
@@ -186,6 +215,108 @@ def mine_frequent_chunks(
     return trimmed
 
 
+def train_bpe_tokens(
+    sequences: Dict[str, List[str]],
+    num_merges: int = 25,
+    min_occurrences: int = 2,
+) -> List[dict]:
+    token_expansions = {}
+    current = {episode_id: list(sequence) for episode_id, sequence in sequences.items()}
+    merges: List[dict] = []
+
+    def expansion(token: str) -> List[str]:
+        return list(token_expansions.get(token, [token]))
+
+    for merge_index in range(num_merges):
+        pair_counts: Counter = Counter()
+        pair_support: Dict[Tuple[str, str], set] = defaultdict(set)
+
+        for episode_id, sequence in current.items():
+            if len(sequence) < 2:
+                continue
+            seen_in_episode = set()
+            for index in range(len(sequence) - 1):
+                pair = (sequence[index], sequence[index + 1])
+                pair_counts[pair] += 1
+                seen_in_episode.add(pair)
+            for pair in seen_in_episode:
+                pair_support[pair].add(episode_id)
+
+        if not pair_counts:
+            break
+
+        best_pair, occurrences = max(
+            pair_counts.items(),
+            key=lambda item: (
+                item[1],
+                len(pair_support[item[0]]),
+                len(expansion(item[0][0])) + len(expansion(item[0][1])),
+                item[0],
+            ),
+        )
+        if occurrences < min_occurrences:
+            break
+
+        left, right = best_pair
+        token_id = f"BPE{merge_index + 1:03d}"
+        token_expansions[token_id] = expansion(left) + expansion(right)
+
+        merged_any = False
+        next_current = {}
+        for episode_id, sequence in current.items():
+            merged_sequence: List[str] = []
+            index = 0
+            while index < len(sequence):
+                if index < len(sequence) - 1 and sequence[index] == left and sequence[index + 1] == right:
+                    merged_sequence.append(token_id)
+                    index += 2
+                    merged_any = True
+                else:
+                    merged_sequence.append(sequence[index])
+                    index += 1
+            next_current[episode_id] = merged_sequence
+
+        if not merged_any:
+            break
+
+        current = next_current
+        merges.append(
+            {
+                "token_id": token_id,
+                "left": left,
+                "right": right,
+                "sequence": token_expansions[token_id],
+                "length": len(token_expansions[token_id]),
+                "occurrences": occurrences,
+                "support": len(pair_support[best_pair]),
+            }
+        )
+
+    return merges
+
+
+def apply_bpe_tokens(sequences: Dict[str, List[str]], merges: Sequence[dict]) -> Dict[str, List[str]]:
+    current = {episode_id: list(sequence) for episode_id, sequence in sequences.items()}
+    for merge in merges:
+        left = merge["left"]
+        right = merge["right"]
+        token_id = merge["token_id"]
+        next_current = {}
+        for episode_id, sequence in current.items():
+            merged_sequence: List[str] = []
+            index = 0
+            while index < len(sequence):
+                if index < len(sequence) - 1 and sequence[index] == left and sequence[index + 1] == right:
+                    merged_sequence.append(token_id)
+                    index += 2
+                else:
+                    merged_sequence.append(sequence[index])
+                    index += 1
+            next_current[episode_id] = merged_sequence
+        current = next_current
+    return current
+
+
 def compress_sequence(sequence: Sequence[str], macros: Sequence[dict]) -> Tuple[List[str], Counter]:
     ordered_macros = sorted(
         macros,
@@ -212,6 +343,13 @@ def compress_sequence(sequence: Sequence[str], macros: Sequence[dict]) -> Tuple[
         index += 1
 
     return compressed, hits
+
+
+def apply_macros(sequences: Dict[str, List[str]], macros: Sequence[dict]) -> Dict[str, List[str]]:
+    return {
+        episode_id: compress_sequence(sequence, macros)[0]
+        for episode_id, sequence in sequences.items()
+    }
 
 
 def compression_summary(sequences: Dict[str, List[str]], macros: Sequence[dict]) -> dict:
@@ -249,4 +387,130 @@ def compression_summary(sequences: Dict[str, List[str]], macros: Sequence[dict])
         },
         "macro_hits": dict(macro_hits),
         "episodes": episodes,
+    }
+
+
+def bpe_summary(sequences: Dict[str, List[str]], merges: Sequence[dict]) -> dict:
+    compressed_sequences = apply_bpe_tokens(sequences, merges)
+    token_ids = {merge["token_id"] for merge in merges}
+    token_hits: Counter = Counter()
+    episodes = []
+    total_primitive = 0
+    total_compressed = 0
+
+    for episode_id, sequence in sorted(sequences.items()):
+        compressed = compressed_sequences.get(episode_id, [])
+        hits = Counter(token for token in compressed if token in token_ids)
+        token_hits.update(hits)
+        primitive_len = len(sequence)
+        compressed_len = len(compressed)
+        total_primitive += primitive_len
+        total_compressed += compressed_len
+        episodes.append(
+            {
+                "episode_id": episode_id,
+                "primitive_steps": primitive_len,
+                "compressed_steps": compressed_len,
+                "compression_ratio": round(compressed_len / primitive_len, 4) if primitive_len else 0.0,
+                "token_hits": dict(hits),
+                "sequence": list(sequence),
+                "compressed_sequence": compressed,
+            }
+        )
+
+    return {
+        "summary": {
+            "episodes": len(episodes),
+            "primitive_steps": total_primitive,
+            "compressed_steps": total_compressed,
+            "compression_ratio": round(total_compressed / total_primitive, 4) if total_primitive else 0.0,
+            "episodes_with_token_use": sum(1 for item in episodes if item["token_hits"]),
+        },
+        "token_hits": dict(token_hits),
+        "episodes": episodes,
+    }
+
+
+def split_sequences(
+    sequences: Dict[str, List[str]],
+    train_ratio: float = 0.8,
+    seed: int = 0,
+) -> Tuple[Dict[str, List[str]], Dict[str, List[str]]]:
+    episode_ids = sorted(sequences)
+    shuffled = list(episode_ids)
+    random.Random(seed).shuffle(shuffled)
+    if not shuffled:
+        return {}, {}
+    train_size = max(1, int(round(len(shuffled) * train_ratio)))
+    if train_ratio < 1.0:
+        train_size = min(train_size, len(shuffled) - 1) if len(shuffled) > 1 else 1
+    train_ids = set(shuffled[:train_size])
+    train = {episode_id: sequences[episode_id] for episode_id in episode_ids if episode_id in train_ids}
+    test = {episode_id: sequences[episode_id] for episode_id in episode_ids if episode_id not in train_ids}
+    return train, test
+
+
+def build_next_token_cache(
+    sequences: Dict[str, List[str]],
+    context_len: int = 2,
+) -> Dict[Tuple[str, ...], Counter]:
+    cache: Dict[Tuple[str, ...], Counter] = defaultdict(Counter)
+    for sequence in sequences.values():
+        if len(sequence) <= context_len:
+            continue
+        for index in range(context_len, len(sequence)):
+            context = tuple(sequence[index - context_len : index])
+            next_token = sequence[index]
+            cache[context][next_token] += 1
+    return cache
+
+
+def evaluate_next_token_cache(
+    train_sequences: Dict[str, List[str]],
+    eval_sequences: Dict[str, List[str]],
+    context_len: int = 2,
+) -> dict:
+    cache = build_next_token_cache(train_sequences, context_len=context_len)
+    total_positions = 0
+    covered_positions = 0
+    correct_positions = 0
+    context_hits: Counter = Counter()
+    context_correct: Counter = Counter()
+
+    for sequence in eval_sequences.values():
+        if len(sequence) <= context_len:
+            continue
+        for index in range(context_len, len(sequence)):
+            total_positions += 1
+            context = tuple(sequence[index - context_len : index])
+            actual = sequence[index]
+            if context not in cache:
+                continue
+            covered_positions += 1
+            prediction = cache[context].most_common(1)[0][0]
+            context_hits[context] += 1
+            if prediction == actual:
+                correct_positions += 1
+                context_correct[context] += 1
+
+    top_contexts = []
+    for context, hits in context_hits.most_common(10):
+        top_contexts.append(
+            {
+                "context": list(context),
+                "hits": hits,
+                "correct": context_correct[context],
+            }
+        )
+
+    return {
+        "context_len": context_len,
+        "cached_contexts": len(cache),
+        "total_positions": total_positions,
+        "covered_positions": covered_positions,
+        "correct_positions": correct_positions,
+        "coverage": round(covered_positions / total_positions, 4) if total_positions else 0.0,
+        "accuracy_on_covered": round(correct_positions / covered_positions, 4) if covered_positions else 0.0,
+        "accuracy_overall": round(correct_positions / total_positions, 4) if total_positions else 0.0,
+        "top_contexts": top_contexts,
     }

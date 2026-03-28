@@ -25,11 +25,17 @@ The first harness is intentionally small:
 - input JSONL traces
 - normalize them into canonical action strings
 - mine frequent multi-step chunks
+- train a BPE-style action tokenizer
 - measure how much those chunks compress trajectories
 
 ## Quickstart
 
 ```bash
+python3 scripts/convert_dataset.py \
+  --source mind2web \
+  --input /path/to/mind2web/data/train \
+  --output data/local/mind2web_train.jsonl
+
 python3 scripts/prepare_traces.py \
   --input data/demo/sample_trace.jsonl \
   --output outputs/demo/canonical_trace.jsonl
@@ -42,6 +48,16 @@ python3 scripts/evaluate_macros.py \
   --input outputs/demo/canonical_trace.jsonl \
   --macros outputs/demo/macros.json \
   --output outputs/demo/eval.json
+
+python3 scripts/compare_tokenizers.py \
+  --input data/demo/sample_trace.jsonl \
+  --output-dir outputs/demo/compare \
+  --train-ratio 0.8 \
+  --context-len 1
+
+python3 scripts/profile_traces.py \
+  --input data/demo/sample_trace.jsonl \
+  --output outputs/demo/profile.json
 ```
 
 ## Why this starts offline
@@ -49,3 +65,11 @@ python3 scripts/evaluate_macros.py \
 - it keeps the repo simple
 - it lets us test trace compressibility before building a full browser runtime
 - it gives us a stable format that later BrowserGym or Playwright adapters can target
+
+## Dataset converters
+
+Current converters target:
+
+- Mind2Web task JSON files
+- WebLINX `replay.json` demonstrations
+- WONDERBREAD-style `trace.json` files

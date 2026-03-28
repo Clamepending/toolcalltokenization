@@ -43,6 +43,16 @@ These are the first datasets we want to try.
 
 We are deliberately **not** starting with every dataset at once. These three are enough to test whether macro mining is even promising.
 
+Two follow-on sources look especially useful once the initial loop is working:
+
+1. **WebLINX 1.1 / WebLINX-BrowserGym**
+   Why:
+   It creates a cleaner bridge between offline demonstrations and BrowserGym-based agent evaluation.
+
+2. **WebChain**
+   Why:
+   It is a very recent large-scale human trace dataset and looks like a strong future source for broader macro mining once the core pipeline is stable.
+
 ### Stage 2: controlled online evaluation
 
 These are the benchmark environments we want for actual agent experiments.
@@ -173,10 +183,14 @@ Metrics:
 - number of reusable macros
 - support per macro
 - share of episodes using at least one macro
+- held-out compression on test episodes
+- held-out next-token cache coverage and accuracy
 
 Success condition:
 
 - we find readable, repeated routines and get non-trivial compression
+- held-out compression remains useful when macros are learned on train and applied to test
+- tokenized traces are at least as cacheable as primitive traces on held-out episodes
 
 ### Experiment 2: macro quality by source
 
@@ -229,15 +243,44 @@ The harness in this repo should stay small and boring.
 
 ### Scripts
 
+- `scripts/convert_dataset.py`
 - `scripts/prepare_traces.py`
 - `scripts/mine_macros.py`
 - `scripts/evaluate_macros.py`
+- `scripts/compare_tokenizers.py`
+- `scripts/profile_traces.py`
 
 ### Shared code
 
 - `toolcalltokenization/trace_utils.py`
 
 This is intentionally not a large package. It is just enough structure to keep the scripts from duplicating logic.
+
+## Current repo findings
+
+These are only from the tiny demo trace in this repo, so they are not claims about the real benchmarks yet.
+
+### Demo result
+
+On the sample trace:
+
+- primitive length: 15 steps
+- frequent-chunk compression: 6 steps total, ratio `0.4`
+- BPE-style compression: 4 steps total, ratio `0.2667`
+
+### What that suggests
+
+1. BPE-style merges can compress more aggressively than fixed frequent chunks on the training set because merges can stack recursively.
+2. That same property means BPE is especially vulnerable to overfitting if we only evaluate in-sample.
+3. On a tiny held-out split of the demo, both frequent chunks and BPE compress the test episode from 5 steps to 2 steps, ratio `0.4`.
+4. For cacheability, a 1-token next-token cache is the right starting point for compressed traces because compression makes the sequences much shorter.
+
+The next meaningful result is therefore not “more toy compression,” but:
+
+- run the converters on real Mind2Web / WONDERBREAD / WebLINX data
+- inspect profile summaries
+- compare in-sample vs held-out compression
+- compare primitive vs macro vs BPE cacheability on held-out episodes
 
 ## Trace format
 
@@ -277,6 +320,7 @@ Those are good next steps, but the repo should first prove that the trace format
 
 1. Add real dataset adapters, starting with Mind2Web.
 2. Add one BrowserGym trace adapter.
-3. Add a typed-slot macro miner beyond simple frequent n-grams.
-4. Add hybrid macro execution inside a controlled browser agent.
-5. Measure online success / speed / cost on WorkArena-L1.
+3. Compare frequent-chunk mining against BPE-style merges on real traces.
+4. Add a typed-slot macro miner beyond simple frequent n-grams.
+5. Add hybrid macro execution inside a controlled browser agent.
+6. Measure online success / speed / cost on WorkArena-L1.
