@@ -10,11 +10,14 @@ from toolcalltokenization.miniwob_benchmark import (
     choose_macro,
     default_miniwob_url,
     macro_action_string,
+    macro_runtime_id,
     observation_text,
     primitive_action_description,
     primitive_action_name,
     representative_templates_for_macro,
     render_action,
+    learned_choice,
+    train_learned_selector,
     semantic_choice,
     semantic_macro_description,
     semantic_macro_name,
@@ -132,15 +135,15 @@ class MiniwobBenchmarkTests(unittest.TestCase):
 
     def test_choose_macro_skips_blocked_macro_ids(self):
         macros = [
-            {"macro_id": "m1", "sequence": ["A", "B"], "replay_precision": 0.8, "support": 3, "trigger_prefix_len": 1},
-            {"macro_id": "m2", "sequence": ["A", "C"], "replay_precision": 0.7, "support": 2, "trigger_prefix_len": 1},
+            {"macro_id": "m1", "suggested_name": "macro_one", "sequence": ["A", "B"], "replay_precision": 0.8, "support": 3, "trigger_prefix_len": 1},
+            {"macro_id": "m2", "suggested_name": "macro_two", "sequence": ["A", "C"], "replay_precision": 0.7, "support": 2, "trigger_prefix_len": 1},
         ]
         chosen = choose_macro(
             ["A", "B"],
             macros,
             policy_mode="trigger_prefix",
             min_replay_precision=0.5,
-            blocked_macro_ids=["m1"],
+            blocked_macro_ids=["macro_one"],
         )
         self.assertEqual(chosen["macro_id"], "m2")
 
@@ -251,6 +254,66 @@ class MiniwobBenchmarkTests(unittest.TestCase):
         }
         choice = semantic_choice(goal=obs["goal"], obs=obs, primitive_step=primitive, primitive_index=0, macros=[password_macro], blocked_macro_ids=[], margin=0.0)
         self.assertEqual(choice["kind"], "primitive")
+
+    def test_macro_runtime_id_prefers_suggested_name(self):
+        macro = {"group_key": "login_user", "macro_id": "M001", "suggested_name": "login_user_fill_username_then_submit_m001"}
+        self.assertEqual(macro_runtime_id(macro), "login_user_fill_username_then_submit_m001")
+
+    def test_learned_choice_can_learn_macro_preference(self):
+        macro = {
+            "group_key": "login_user",
+            "macro_id": "M1",
+            "suggested_name": "login_user_fill_username_then_fill_password_then_click_login_m001",
+            "suggested_description": "Fill the username and password fields, then click login.",
+            "sequence": ["FILL|role=input|label=username|use=B01", "FILL|role=input|label=password|use=B02", "CLICK|role=button|label=login"],
+            "step_templates": [
+                {"kind": "fill", "target_role": "textbox", "target_label": "username"},
+                {"kind": "fill", "target_role": "textbox", "target_label": "password"},
+                {"kind": "click", "target_role": "button", "target_label": "login"},
+            ],
+        }
+        primitive = {"kind": "fill", "bid": "16", "target_role": "textbox", "target_label": "username"}
+        examples = [
+            {
+                "goal": 'Enter the username "alice" and password "pw" and press login.',
+                "obs_text": "textbox username textbox password button login",
+                "primitive_step": primitive,
+                "candidates": [
+                    {
+                        "kind": "primitive",
+                        "id": "__primitive__",
+                        "name": "step_1_fill_username",
+                        "description": "Type the requested value into the username.",
+                        "length": 1,
+                        "tokens": {"fill", "username"},
+                        "primitive_name": "step_1_fill_username",
+                        "primitive_description": "Type the requested value into the username.",
+                    },
+                    {
+                        "kind": "macro",
+                        "id": macro_runtime_id(macro),
+                        "name": macro["suggested_name"],
+                        "description": macro["suggested_description"],
+                        "length": 3,
+                        "tokens": {"login", "username", "password", "fill", "click"},
+                        "macro": macro,
+                    },
+                ],
+                "gold_id": macro_runtime_id(macro),
+            }
+        ]
+        model = train_learned_selector(examples, epochs=4, seed=0)
+        choice = learned_choice(
+            model=model,
+            goal=examples[0]["goal"],
+            obs={"goal": examples[0]["goal"], "axtree_object": {"nodes": [ax_node("20", "button", "Login")]}},
+            primitive_step=primitive,
+            primitive_index=0,
+            macros=[macro],
+            blocked_macro_ids=[],
+            use_start_step_guard=True,
+        )
+        self.assertEqual(choice["kind"], "macro")
 
 
 if __name__ == "__main__":

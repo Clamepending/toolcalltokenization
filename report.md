@@ -1271,6 +1271,7 @@ So the current result is:
 - semantic packaging can work
 - but only when macro selection is still constrained by a lightweight structural precondition
 - names and descriptions alone are too ambiguous in a shared browser action space
+- a tiny learned chooser goes further: it recovers the full upper bound even with the explicit structural guard removed
 
 #### Semantic Macro Selection With Named Actions
 
@@ -1318,6 +1319,41 @@ This is the strongest current evidence that the "real agent with named macro too
 - but only if the action space is paired with explicit, cheap macro preconditions
 - this supports building a true LLM-driven action chooser next, because the guardrails seem to matter more than the exact ranking model
 
+### Learned Named-Action Chooser
+
+We then pushed one step further and replaced the hand-tuned semantic scorer with a tiny learned selector:
+
+- script: `scripts/run_miniwob_learned_policy_benchmark.py`
+- model: averaged perceptron over goal text, observation text, action names/descriptions, and a few structural features
+- training data: live MiniWoB train episodes only
+- train size on the stable split: `320` decision contexts
+
+This is still very small and very simple. There is no LLM in the loop and no external ML stack.
+
+But the result is strong:
+
+1. Learned chooser with guard:
+   `80 -> 32` decisions, `0` failed macro attempts, `1.0` success
+2. Learned chooser without guard:
+   `80 -> 32` decisions, `0` failed macro attempts, `1.0` success
+
+That means the learned controller absorbed the ambiguity that broke the untrained semantic policy.
+
+This is the clearest sign so far that named macro tools are not just a cosmetic packaging step:
+
+- the controller can actually learn when to call them
+- even a tiny trained ranker is enough on this benchmark
+- the gain is not coming from hidden oracle matching once the policy is learned
+
+The main caveat is that this is still MiniWoB:
+
+- train and eval are from the same task families
+- the action vocabulary is small
+- workflows are short and repeated
+
+So this does **not** prove that the same learned chooser will generalize to Mind2Web or live sites.
+It does show that our macro representation and naming scheme are good enough for a learned policy to exploit.
+
 #### Interpretation
 
 This is the strongest result in the repo so far.
@@ -1329,6 +1365,7 @@ It tells us:
 - when coverage is dense and task families are tight, live decision savings can be large
 - `2`-step and `3`-step workflow macros are already enough to remove around `60%` of decisions on held-out browser episodes
 - named macro tools can be selected successfully in a shared action space, but only with lightweight structural guarding
+- a tiny learned chooser can remove the need for that explicit guard on the stable MiniWoB benchmark
 
 It also sharpens the research picture:
 
@@ -1363,6 +1400,7 @@ For MiniWoB, all three now have concrete answers:
 - some of it survives under a global action space
 - loose triggering can burn roughly half of the remaining gain even without hurting task success
 - semantic names help only after we add start-step preconditions; without those guardrails, the agent over-calls macros badly
+- once the chooser is trained on named actions, it can internalize much of that precondition logic itself on MiniWoB
 
 #### Current decisions
 
@@ -1380,13 +1418,16 @@ These are the current project decisions based on the evidence above.
 4. Treat **semantic tool selection + structural preconditions** as the next realistic controller.
    The new semantic MiniWoB benchmark shows that names/descriptions can work, but only when macro calls are masked by cheap first-step compatibility checks.
 
-5. Prefer **better triggering** over **stricter promotion thresholds**.
+5. Treat a **small learned chooser over named actions** as the most promising next controller for broader benchmarks.
+   On MiniWoB it matches the exact upper bound even without an explicit guard, which is much stronger than the untrained semantic policy.
+
+6. Prefer **better triggering** over **stricter promotion thresholds**.
    The trigger sweep shows that replay-threshold tightening alone cannot recover the gain lost by a loose trigger.
 
-6. Keep **primitive fallback** in the loop.
+7. Keep **primitive fallback** in the loop.
    It is the reason the loose-trigger setting still keeps task success at `1.0` despite wasted decisions.
 
-7. For the next benchmark jump, prioritize **state-aware preconditions** over more mining sophistication.
+8. For the next benchmark jump, prioritize **state-aware preconditions** over more mining sophistication.
    The main remaining loss is now selection ambiguity, not inability to discover chunks.
 
 #### BrowserGym / WorkArena blockers
@@ -1530,6 +1571,7 @@ The practical implication is:
 
 - if we want `50%`-scale savings on broader browser benchmarks, we need much better coverage and stronger page-state-aware macro masks
 - simply mining more chunks from the current data is unlikely to be enough
+- the MiniWoB learned-selector result is encouraging, but it does not remove the broader coverage problem
 
 Current results for `dataflow_coarse`:
 

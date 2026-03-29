@@ -45,6 +45,8 @@ def build_summary() -> dict:
     miniwob_semantic_global_noguard = load_json(ROOT / "outputs" / "miniwob_live_v3_semantic_global_noguard_stable_m0_semantic_policy_benchmark.json")
     miniwob_semantic_global_guard = load_json(ROOT / "outputs" / "miniwob_live_v3_semantic_global_guard_v3_stable_m0_semantic_policy_benchmark.json")
     miniwob_semantic_global_guard_bias = load_json(ROOT / "outputs" / "miniwob_live_v3_semantic_global_guard_v4_stable_mneg1_semantic_policy_benchmark.json")
+    miniwob_learned_global_guard = load_json(ROOT / "outputs" / "miniwob_live_v3_learned_global_guard_stable_learned_policy_benchmark.json")
+    miniwob_learned_global_noguard = load_json(ROOT / "outputs" / "miniwob_live_v3_learned_global_noguard_stable_learned_policy_benchmark.json")
     trigger1_registry = load_json(ROOT / "outputs" / "miniwob_live_v3_global_trigger_p1_v3_macro_registry.json")
 
     mind2web_covered_steps = sum(
@@ -96,6 +98,8 @@ def build_summary() -> dict:
             "miniwob_semantic_global_noguard": miniwob_semantic_global_noguard["summary"],
             "miniwob_semantic_global_guard": miniwob_semantic_global_guard["summary"],
             "miniwob_semantic_global_guard_bias": miniwob_semantic_global_guard_bias["summary"],
+            "miniwob_learned_global_guard": miniwob_learned_global_guard["summary"],
+            "miniwob_learned_global_noguard": miniwob_learned_global_noguard["summary"],
         },
         "mind2web_hierarchy_sweep": mind2web_hierarchy["variants"],
         "global_trigger_sweep": [
@@ -109,6 +113,8 @@ def build_summary() -> dict:
             {"label": "Semantic no guard", **miniwob_semantic_global_noguard["summary"]},
             {"label": "Semantic + guard", **miniwob_semantic_global_guard["summary"]},
             {"label": "Semantic + guard + macro bias", **miniwob_semantic_global_guard_bias["summary"]},
+            {"label": "Learned no guard", **miniwob_learned_global_noguard["summary"]},
+            {"label": "Learned + guard", **miniwob_learned_global_guard["summary"]},
             {"label": "Prefix 2-step", **miniwob_global_taskregistry_trigger["summary"]},
             {"label": "Exact upper bound", **miniwob_global_taskregistry_oracle["summary"]},
         ],
@@ -327,11 +333,11 @@ def plot_semantic_policy_sweep(summary: dict) -> Path:
     failed_calls = [int(item.get("failed_macro_calls", 0)) for item in sweep]
 
     fig, axes = plt.subplots(2, 1, figsize=(10.4, 7.2), sharex=True, gridspec_kw={"height_ratios": [2, 1.5]})
-    colors = ["#b23a48", "#457b9d", "#2a9d8f", "#4d908e", "#6a994e"]
+    colors = ["#b23a48", "#457b9d", "#2a9d8f", "#7b2cbf", "#5a189a", "#4d908e", "#6a994e"]
 
     bars = axes[0].bar(labels, reductions, color=colors)
     axes[0].set_ylabel("Decision Reduction (%)")
-    axes[0].set_title("Semantic Names Need Structural Guarding; With It, They Reach the Shared-Vocabulary Upper Bound")
+    axes[0].set_title("Untrained Semantic Selection Needs Guarding; a Tiny Learned Chooser Recovers the Full Macro Benefit")
     ymin = min(0, min(reductions) * 1.2)
     ymax = max(reductions) * 1.2
     axes[0].set_ylim(ymin, ymax)

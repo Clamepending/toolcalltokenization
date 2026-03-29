@@ -5,6 +5,7 @@ from pathlib import Path
 from time import perf_counter
 from typing import Callable, Dict, Iterable, List, Sequence, Tuple
 import re
+import random
 
 from .trace_utils import (
     compress_sequence,
@@ -622,6 +623,15 @@ def macro_action_string(macro: dict, binding_values: Dict[str, str]) -> str:
     return "\n".join(render_action(step) for step in bind_macro_steps(macro, binding_values))
 
 
+def macro_runtime_id(macro: dict) -> str:
+    name = str(macro.get("suggested_name", "")).strip()
+    if name:
+        return name
+    group_key = str(macro.get("group_key", "<all>")).strip()
+    macro_id = str(macro.get("macro_id", "macro")).strip() or "macro"
+    return f"{group_key}::{macro_id}"
+
+
 def choose_macro(
     remaining_sequence: Sequence[str],
     macros: Sequence[dict],
@@ -633,7 +643,7 @@ def choose_macro(
     blocked_ids = {str(macro_id) for macro_id in blocked_macro_ids}
     candidates = []
     for macro in macros:
-        if str(macro.get("macro_id", "")) in blocked_ids:
+        if macro_runtime_id(macro) in blocked_ids:
             continue
         if float(macro.get("replay_precision", 0.0)) < min_replay_precision:
             continue
@@ -1158,7 +1168,7 @@ def semantic_choice(
     best_macro_score = float("-inf")
     blocked = {str(macro_id) for macro_id in blocked_macro_ids}
     for macro in macros:
-        macro_id = str(macro.get("macro_id", macro.get("suggested_name", "")))
+        macro_id = macro_runtime_id(macro)
         if macro_id in blocked:
             continue
         if use_start_step_guard and not macro_start_compatible(primitive_step, macro):
@@ -1190,9 +1200,430 @@ def semantic_choice(
         "kind": "macro",
         "score": best_macro_score,
         "macro": best_macro,
+        "macro_id": macro_runtime_id(best_macro),
         "primitive_score": primitive_score,
         "primitive_name": primitive_name,
         "primitive_description": primitive_description,
+    }
+
+
+def candidate_set(
+    *,
+    primitive_step: Step,
+    primitive_index: int,
+    macros: Sequence[dict],
+    blocked_macro_ids: Sequence[str],
+    use_start_step_guard: bool,
+) -> List[dict]:
+    primitive_name = primitive_action_name(primitive_step, primitive_index)
+    primitive_description = primitive_action_description(primitive_step)
+    candidates = [
+        {
+            "kind": "primitive",
+            "id": "__primitive__",
+            "name": primitive_name,
+            "description": primitive_description,
+            "length": 1,
+            "tokens": text_tokens(
+                action_semantic_text(
+                    primitive_name,
+                    primitive_description,
+                    f"{primitive_step.get('target_role', '')} {primitive_step.get('target_label', '')}",
+                )
+            ),
+            "primitive_name": primitive_name,
+            "primitive_description": primitive_description,
+        }
+    ]
+
+    blocked = {str(macro_id) for macro_id in blocked_macro_ids}
+    for macro in macros:
+        macro_id = macro_runtime_id(macro)
+        if macro_id in blocked:
+            continue
+        if use_start_step_guard and not macro_start_compatible(primitive_step, macro):
+            continue
+        action_text = action_semantic_text(
+            str(macro.get("suggested_name", "")),
+            str(macro.get("suggested_description", "")),
+            " ".join(str(step) for step in macro.get("sequence", [])),
+        )
+        candidates.append(
+            {
+                "kind": "macro",
+                "id": macro_id,
+                "name": str(macro.get("suggested_name", "")),
+                "description": str(macro.get("suggested_description", "")),
+                "length": len(macro.get("sequence", [])),
+                "tokens": text_tokens(action_text),
+                "macro": macro,
+            }
+        )
+    return candidates
+
+
+def candidate_features(
+    *,
+    goal_tokens: set[str],
+    obs_tokens: set[str],
+    primitive_step: Step,
+    candidate: dict,
+) -> Dict[str, float]:
+    features: Dict[str, float] = {
+        "bias": 1.0,
+        f"kind:{candidate['kind']}": 1.0,
+        f"length:{candidate['length']}": 1.0,
+    }
+    action_tokens = set(candidate.get("tokens", set()))
+    for token in sorted(goal_tokens & action_tokens):
+        features[f"goal_overlap:{token}"] = 1.0
+    for token in sorted(obs_tokens & action_tokens):
+        features[f"obs_overlap:{token}"] = 1.0
+    for token in sorted(action_tokens):
+        features[f"action_token:{token}"] = features.get(f"action_token:{token}", 0.0) + 0.15
+
+    if candidate["kind"] == "primitive":
+        kind = normalize_label(str(primitive_step.get("kind", ""))) or "action"
+        label = normalize_label(str(primitive_step.get("target_label", ""))) or normalize_label(str(primitive_step.get("target_role", ""))) or "element"
+        features["primitive_bias"] = 1.0
+        features[f"primitive_kind:{kind}"] = 1.0
+        features[f"primitive_label:{label}"] = 1.0
+        return features
+
+    macro = dict(candidate["macro"])
+    features["macro_bias"] = 1.0
+    features["macro_length"] = float(candidate["length"])
+    features[f"macro_name:{candidate['name']}"] = 1.0
+    templates = list(macro.get("step_templates", []))
+    if not templates:
+        return features
+    start = templates[0]
+    primitive_kind = normalize_label(str(primitive_step.get("kind", "")))
+    start_kind = normalize_label(str(start.get("kind", "")))
+    if primitive_kind and start_kind and primitive_kind == start_kind:
+        features["start_kind_match"] = 1.0
+    primitive_role = normalize_label(str(primitive_step.get("target_role", "")))
+    start_role = normalize_label(str(start.get("target_role", "")))
+    if primitive_role and start_role and primitive_role == start_role:
+        features[f"start_role_match:{start_role}"] = 1.0
+    for token in sorted(step_label_tokens(primitive_step) & step_label_tokens(start)):
+        features[f"start_label_match:{token}"] = 1.0
+    return features
+
+
+def score_linear(weights: Dict[str, float], features: Dict[str, float]) -> float:
+    return sum(weights.get(key, 0.0) * value for key, value in features.items())
+
+
+def update_averaged_weights(
+    *,
+    weights: Dict[str, float],
+    totals: Dict[str, float],
+    stamps: Dict[str, int],
+    step: int,
+    features: Dict[str, float],
+    scale: float,
+) -> None:
+    for key, value in features.items():
+        current = weights.get(key, 0.0)
+        totals[key] = totals.get(key, 0.0) + (step - stamps.get(key, 0)) * current
+        stamps[key] = step
+        weights[key] = current + scale * value
+
+
+def finalize_averaged_weights(
+    weights: Dict[str, float],
+    totals: Dict[str, float],
+    stamps: Dict[str, int],
+    step: int,
+) -> Dict[str, float]:
+    averaged: Dict[str, float] = {}
+    if step <= 0:
+        return dict(weights)
+    for key, value in weights.items():
+        total = totals.get(key, 0.0) + (step - stamps.get(key, 0)) * value
+        averaged_value = total / step
+        if averaged_value:
+            averaged[key] = averaged_value
+    return averaged
+
+
+def split_train_eval_episode_ids(
+    rows: Sequence[dict],
+    *,
+    group_by: str = "task_name",
+    canonicalization_mode: str = "dataflow_coarse",
+    train_ratio: float = 0.8,
+    split_seed: int = 0,
+) -> Tuple[Dict[str, List[str]], Dict[str, List[str]]]:
+    grouped_rows = group_rows(rows, group_by)
+    train_ids: Dict[str, List[str]] = {}
+    eval_ids: Dict[str, List[str]] = {}
+    for group_key, group in grouped_rows.items():
+        represented_rows = represent_rows(group, mode=canonicalization_mode)
+        sequences = group_sequences(represented_rows)
+        train_sequences, eval_sequences = split_sequences(sequences, train_ratio=train_ratio, seed=split_seed)
+        if not eval_sequences:
+            eval_sequences = sequences
+        if not train_sequences:
+            train_sequences = sequences
+        train_ids[group_key] = sorted(train_sequences)
+        eval_ids[group_key] = sorted(eval_sequences)
+    return train_ids, eval_ids
+
+
+def action_space_macros(
+    *,
+    group_key: str,
+    registry_by_group: Dict[str, List[dict]],
+    all_macros: Sequence[dict],
+    action_scope: str,
+) -> List[dict]:
+    if action_scope == "task":
+        return sorted(registry_by_group.get(group_key, []), key=macro_sort_key)
+    if action_scope == "global":
+        return list(all_macros)
+    raise ValueError(f"Unsupported action_scope: {action_scope!r}")
+
+
+def oracle_choice_id(
+    *,
+    remaining_sequence: Sequence[str],
+    macros: Sequence[dict],
+    blocked_macro_ids: Sequence[str],
+) -> str:
+    macro = choose_macro(
+        remaining_sequence,
+        macros,
+        policy_mode="oracle_exact",
+        min_replay_precision=0.0,
+        blocked_macro_ids=blocked_macro_ids,
+    )
+    if macro is None:
+        return "__primitive__"
+    return macro_runtime_id(macro)
+
+
+def collect_learned_policy_examples(
+    rows: Sequence[dict],
+    episodes: Sequence[dict],
+    registry_payload: dict,
+    *,
+    episode_ids_by_group: Dict[str, List[str]],
+    group_by: str = "task_name",
+    canonicalization_mode: str = "dataflow_coarse",
+    action_scope: str = "task",
+    headless: bool = True,
+    miniwob_url: str | None = None,
+    launch_retries: int = 2,
+    use_start_step_guard: bool = True,
+) -> List[dict]:
+    import gymnasium as gym
+    import browsergym.miniwob  # noqa: F401
+    import os
+    import time
+
+    if miniwob_url:
+        os.environ["MINIWOB_URL"] = miniwob_url
+
+    registry_by_group: Dict[str, List[dict]] = defaultdict(list)
+    for entry in registry_payload.get("registry", []):
+        registry_by_group[str(entry.get("group_key", "<all>"))].append(entry)
+    all_macros = sorted(list(registry_payload.get("registry", [])), key=macro_sort_key)
+    episode_meta = {str(episode["episode_id"]): episode for episode in episodes}
+    examples: List[dict] = []
+
+    for group_key, episode_ids in sorted(episode_ids_by_group.items()):
+        macros = action_space_macros(group_key=group_key, registry_by_group=registry_by_group, all_macros=all_macros, action_scope=action_scope)
+        for episode_id in episode_ids:
+            meta = episode_meta[str(episode_id)]
+            env = None
+            last_error = None
+            for attempt in range(launch_retries + 1):
+                try:
+                    env = gym.make(str(meta["env_id"]), headless=headless)
+                    obs, _ = env.reset(seed=int(meta["seed"]))
+                    last_error = None
+                    break
+                except Exception as exc:  # pragma: no cover - live-only path
+                    last_error = exc
+                    if env is not None:
+                        try:
+                            env.close()
+                        except Exception:
+                            pass
+                        env = None
+                    if attempt >= launch_retries:
+                        raise
+                    time.sleep(min(2.0 * (attempt + 1), 5.0))
+            if last_error is not None:
+                raise last_error
+
+            goal = str(obs.get("goal", ""))
+            task_name = str(meta["task_name"])
+            plan = build_plan(task_name, goal, obs)
+            represented = represented_plan(
+                task_name=task_name,
+                env_id=str(meta["env_id"]),
+                seed=int(meta["seed"]),
+                goal=goal,
+                plan=plan,
+                canonicalization_mode=canonicalization_mode,
+                url=str(obs.get("url", "")),
+            )
+            sequence = [row["canonical_action"] for row in represented]
+
+            for index, step in enumerate(plan):
+                candidates = candidate_set(
+                    primitive_step=step,
+                    primitive_index=index,
+                    macros=macros,
+                    blocked_macro_ids=[],
+                    use_start_step_guard=use_start_step_guard,
+                )
+                candidate_ids = {candidate["id"] for candidate in candidates}
+                gold_id = oracle_choice_id(
+                    remaining_sequence=sequence[index:],
+                    macros=[candidate["macro"] for candidate in candidates if candidate["kind"] == "macro"],
+                    blocked_macro_ids=[],
+                )
+                if gold_id not in candidate_ids:
+                    gold_id = "__primitive__"
+                examples.append(
+                    {
+                        "episode_id": str(episode_id),
+                        "group_key": str(group_key),
+                        "goal": goal,
+                        "obs_text": observation_text(obs),
+                        "primitive_step": dict(step),
+                        "primitive_index": index,
+                        "candidates": candidates,
+                        "gold_id": gold_id,
+                    }
+                )
+                obs, reward, terminated, truncated, info = env.step(render_action(step))
+                if terminated or truncated:
+                    break
+
+            env.close()
+
+    return examples
+
+
+def train_learned_selector(
+    examples: Sequence[dict],
+    *,
+    epochs: int = 8,
+    seed: int = 0,
+) -> dict:
+    weights: Dict[str, float] = {}
+    totals: Dict[str, float] = {}
+    stamps: Dict[str, int] = {}
+    updates = 0
+    step_count = 0
+    rng = random.Random(seed)
+    ordered = list(examples)
+
+    for _ in range(epochs):
+        rng.shuffle(ordered)
+        for example in ordered:
+            goal_tokens = text_tokens(str(example["goal"]))
+            obs_tokens = text_tokens(str(example["obs_text"]))
+            feature_map = {
+                candidate["id"]: candidate_features(
+                    goal_tokens=goal_tokens,
+                    obs_tokens=obs_tokens,
+                    primitive_step=dict(example["primitive_step"]),
+                    candidate=candidate,
+                )
+                for candidate in example["candidates"]
+            }
+            scored = sorted(
+                ((score_linear(weights, features), candidate_id) for candidate_id, features in feature_map.items()),
+                key=lambda item: (item[0], item[1] != "__primitive__", item[1]),
+                reverse=True,
+            )
+            predicted_id = scored[0][1] if scored else "__primitive__"
+            gold_id = str(example["gold_id"])
+            step_count += 1
+            if predicted_id == gold_id:
+                continue
+            updates += 1
+            update_averaged_weights(
+                weights=weights,
+                totals=totals,
+                stamps=stamps,
+                step=step_count,
+                features=feature_map[gold_id],
+                scale=1.0,
+            )
+            update_averaged_weights(
+                weights=weights,
+                totals=totals,
+                stamps=stamps,
+                step=step_count,
+                features=feature_map[predicted_id],
+                scale=-1.0,
+            )
+
+    averaged = finalize_averaged_weights(weights, totals, stamps, max(step_count, 1))
+    return {
+        "model_type": "averaged_perceptron",
+        "epochs": epochs,
+        "seed": seed,
+        "examples": len(examples),
+        "updates": updates,
+        "weights": averaged,
+    }
+
+
+def learned_choice(
+    *,
+    model: dict,
+    goal: str,
+    obs: dict,
+    primitive_step: Step,
+    primitive_index: int,
+    macros: Sequence[dict],
+    blocked_macro_ids: Sequence[str],
+    use_start_step_guard: bool = True,
+) -> dict:
+    candidates = candidate_set(
+        primitive_step=primitive_step,
+        primitive_index=primitive_index,
+        macros=macros,
+        blocked_macro_ids=blocked_macro_ids,
+        use_start_step_guard=use_start_step_guard,
+    )
+    weights = dict(model.get("weights", {}))
+    goal_tokens = text_tokens(goal)
+    obs_tokens = text_tokens(observation_text(obs))
+    scored: List[Tuple[float, dict]] = []
+    for candidate in candidates:
+        features = candidate_features(
+            goal_tokens=goal_tokens,
+            obs_tokens=obs_tokens,
+            primitive_step=primitive_step,
+            candidate=candidate,
+        )
+        score = score_linear(weights, features)
+        scored.append((score, candidate))
+    scored.sort(key=lambda item: (item[0], item[1]["kind"] == "macro", item[1]["id"]), reverse=True)
+    best_score, best = scored[0]
+    if best["kind"] == "primitive":
+        return {
+            "kind": "primitive",
+            "score": best_score,
+            "primitive_name": best["primitive_name"],
+            "primitive_description": best["primitive_description"],
+        }
+    return {
+        "kind": "macro",
+        "score": best_score,
+        "macro": best["macro"],
+        "macro_id": best["id"],
+        "primitive_name": candidates[0]["primitive_name"],
+        "primitive_description": candidates[0]["primitive_description"],
     }
 
 
@@ -1490,6 +1921,318 @@ def evaluate_live_semantic_policy_benchmark(
             "estimated_time_saved_ms": round(primitive_total_time_ms - macro_total_time_ms, 3),
             "macro_hits": dict(macro_hits),
         },
+        "groups": groups,
+    }
+
+
+def evaluate_live_learned_policy_benchmark(
+    rows: Sequence[dict],
+    episodes: Sequence[dict],
+    registry_payload: dict,
+    *,
+    group_by: str = "task_name",
+    canonicalization_mode: str = "dataflow_coarse",
+    train_ratio: float = 0.8,
+    split_seed: int = 0,
+    decision_latency_ms: int = 1000,
+    headless: bool = True,
+    miniwob_url: str | None = None,
+    action_scope: str = "task",
+    launch_retries: int = 2,
+    use_start_step_guard: bool = True,
+    training_epochs: int = 8,
+    training_seed: int = 0,
+) -> dict:
+    import gymnasium as gym
+    import browsergym.miniwob  # noqa: F401
+    import os
+    import time
+
+    if miniwob_url:
+        os.environ["MINIWOB_URL"] = miniwob_url
+
+    train_ids_by_group, eval_ids_by_group = split_train_eval_episode_ids(
+        rows,
+        group_by=group_by,
+        canonicalization_mode=canonicalization_mode,
+        train_ratio=train_ratio,
+        split_seed=split_seed,
+    )
+    training_examples = collect_learned_policy_examples(
+        rows,
+        episodes,
+        registry_payload,
+        episode_ids_by_group=train_ids_by_group,
+        group_by=group_by,
+        canonicalization_mode=canonicalization_mode,
+        action_scope=action_scope,
+        headless=headless,
+        miniwob_url=miniwob_url,
+        launch_retries=launch_retries,
+        use_start_step_guard=use_start_step_guard,
+    )
+    model = train_learned_selector(training_examples, epochs=training_epochs, seed=training_seed)
+
+    registry_by_group: Dict[str, List[dict]] = defaultdict(list)
+    for entry in registry_payload.get("registry", []):
+        registry_by_group[str(entry.get("group_key", "<all>"))].append(entry)
+    all_macros = sorted(list(registry_payload.get("registry", [])), key=macro_sort_key)
+    episode_meta = {episode["episode_id"]: episode for episode in episodes}
+    total_primitive_steps = 0
+    total_agent_decisions = 0
+    total_browser_time_ms = 0.0
+    total_successes = 0
+    total_episodes = 0
+    total_attempted_macro_calls = 0
+    total_successful_macro_calls = 0
+    total_failed_macro_calls = 0
+    macro_hits: Counter = Counter()
+    groups = []
+
+    for group_key, eval_ids in sorted(eval_ids_by_group.items()):
+        macros = action_space_macros(group_key=group_key, registry_by_group=registry_by_group, all_macros=all_macros, action_scope=action_scope)
+        group_reports = []
+        for episode_id in eval_ids:
+            meta = episode_meta[episode_id]
+            env = None
+            last_error = None
+            for attempt in range(launch_retries + 1):
+                try:
+                    env = gym.make(str(meta["env_id"]), headless=headless)
+                    obs, _ = env.reset(seed=int(meta["seed"]))
+                    last_error = None
+                    break
+                except Exception as exc:  # pragma: no cover - exercised in live benchmark only
+                    last_error = exc
+                    if env is not None:
+                        try:
+                            env.close()
+                        except Exception:
+                            pass
+                        env = None
+                    if attempt >= launch_retries:
+                        raise
+                    time.sleep(min(2.0 * (attempt + 1), 5.0))
+            if last_error is not None:
+                raise last_error
+
+            goal = str(obs.get("goal", ""))
+            task_name = str(meta["task_name"])
+            plan = build_plan(task_name, goal, obs)
+            represented = represented_plan(
+                task_name=task_name,
+                env_id=str(meta["env_id"]),
+                seed=int(meta["seed"]),
+                goal=goal,
+                plan=plan,
+                canonicalization_mode=canonicalization_mode,
+                url=str(obs.get("url", "")),
+            )
+            sequence = [row["canonical_action"] for row in represented]
+
+            index = 0
+            agent_decisions = 0
+            browser_time_ms = 0.0
+            attempted_macro_calls = 0
+            successful_macro_calls = 0
+            failed_macro_calls = 0
+            episode_macro_hits: Counter = Counter()
+            blocked_macros_by_index: Dict[int, set[str]] = defaultdict(set)
+            attempted_macro_ids: List[str] = []
+            successful_macro_ids: List[str] = []
+            failed_macro_ids: List[str] = []
+            choice_trace: List[dict] = []
+            success = False
+            final_error = ""
+
+            while index < len(plan):
+                choice = learned_choice(
+                    model=model,
+                    goal=goal,
+                    obs=obs,
+                    primitive_step=plan[index],
+                    primitive_index=index,
+                    macros=macros,
+                    blocked_macro_ids=blocked_macros_by_index[index],
+                    use_start_step_guard=use_start_step_guard,
+                )
+                if choice["kind"] == "macro":
+                    macro = choice["macro"]
+                    span = len(macro.get("sequence", []))
+                    macro_sequence = list(macro.get("sequence", []))
+                    macro_id = str(choice["macro_id"])
+                    attempted_macro_calls += 1
+                    attempted_macro_ids.append(macro_id)
+                    agent_decisions += 1
+                    choice_trace.append(
+                        {
+                            "index": index,
+                            "choice": "macro",
+                            "macro_id": macro_id,
+                            "macro_name": macro.get("suggested_name"),
+                            "score": round(float(choice["score"]), 3),
+                        }
+                    )
+                    current_sequence = list(sequence[index : index + span])
+                    if current_sequence != macro_sequence:
+                        failed_macro_calls += 1
+                        failed_macro_ids.append(macro_id)
+                        blocked_macros_by_index[index].add(macro_id)
+                        continue
+
+                    macro_failed = False
+                    executed_steps = 0
+                    for step in plan[index : index + span]:
+                        action = render_action(step)
+                        start = perf_counter()
+                        obs, reward, terminated, truncated, info = env.step(action)
+                        browser_time_ms += (perf_counter() - start) * 1000.0
+                        final_error = str(obs.get("last_action_error", ""))
+                        if final_error:
+                            failed_macro_calls += 1
+                            failed_macro_ids.append(macro_id)
+                            blocked_macros_by_index[index + executed_steps].add(macro_id)
+                            macro_failed = True
+                            break
+                        executed_steps += 1
+                        if terminated or truncated:
+                            task_info = info.get("task_info", {})
+                            success = bool(task_info.get("RAW_REWARD_GLOBAL", 0) > 0 or reward > 0)
+                            break
+
+                    if macro_failed:
+                        index += executed_steps
+                        continue
+
+                    successful_macro_calls += 1
+                    successful_macro_ids.append(macro_id)
+                    episode_macro_hits[macro_id] += 1
+                    index += span
+                    if terminated or truncated:
+                        break
+                    continue
+
+                action = render_action(plan[index])
+                agent_decisions += 1
+                choice_trace.append(
+                    {
+                        "index": index,
+                        "choice": "primitive",
+                        "primitive_name": choice["primitive_name"],
+                        "primitive_description": choice["primitive_description"],
+                        "score": round(float(choice["score"]), 3),
+                    }
+                )
+                start = perf_counter()
+                obs, reward, terminated, truncated, info = env.step(action)
+                browser_time_ms += (perf_counter() - start) * 1000.0
+                final_error = str(obs.get("last_action_error", ""))
+                index += 1
+                if terminated or truncated:
+                    task_info = info.get("task_info", {})
+                    success = bool(task_info.get("RAW_REWARD_GLOBAL", 0) > 0 or reward > 0)
+                    break
+
+            env.close()
+
+            primitive_steps = int(meta["primitive_steps"])
+            total_primitive_steps += primitive_steps
+            total_agent_decisions += agent_decisions
+            total_browser_time_ms += browser_time_ms
+            total_successes += int(success)
+            total_episodes += 1
+            total_attempted_macro_calls += attempted_macro_calls
+            total_successful_macro_calls += successful_macro_calls
+            total_failed_macro_calls += failed_macro_calls
+            macro_hits.update(episode_macro_hits)
+
+            group_reports.append(
+                {
+                    "episode_id": episode_id,
+                    "success": success,
+                    "primitive_steps": primitive_steps,
+                    "agent_decisions": agent_decisions,
+                    "steps_saved": primitive_steps - agent_decisions,
+                    "attempted_macro_calls": attempted_macro_calls,
+                    "successful_macro_calls": successful_macro_calls,
+                    "failed_macro_calls": failed_macro_calls,
+                    "attempted_macro_ids": attempted_macro_ids,
+                    "successful_macro_ids": successful_macro_ids,
+                    "failed_macro_ids": failed_macro_ids,
+                    "browser_time_ms": round(browser_time_ms, 3),
+                    "primitive_total_time_ms": round(float(meta["browser_time_ms"]) + primitive_steps * decision_latency_ms, 3),
+                    "macro_total_time_ms": round(browser_time_ms + agent_decisions * decision_latency_ms, 3),
+                    "macro_hits": dict(episode_macro_hits),
+                    "choice_trace": choice_trace,
+                    "last_action_error": final_error,
+                }
+            )
+
+        if not group_reports:
+            continue
+
+        primitive_group_steps = sum(item["primitive_steps"] for item in group_reports)
+        agent_group_steps = sum(item["agent_decisions"] for item in group_reports)
+        groups.append(
+            {
+                "group_key": group_key,
+                "macros_available": len(macros),
+                "episodes": group_reports,
+                "summary": {
+                    "episodes": len(group_reports),
+                    "success_rate": round(sum(1 for item in group_reports if item["success"]) / len(group_reports), 4),
+                    "primitive_steps": primitive_group_steps,
+                    "agent_decisions": agent_group_steps,
+                    "steps_saved": primitive_group_steps - agent_group_steps,
+                    "decision_reduction_ratio": round((primitive_group_steps - agent_group_steps) / primitive_group_steps, 4)
+                    if primitive_group_steps
+                    else 0.0,
+                    "attempted_macro_calls": sum(item["attempted_macro_calls"] for item in group_reports),
+                    "successful_macro_calls": sum(item["successful_macro_calls"] for item in group_reports),
+                    "failed_macro_calls": sum(item["failed_macro_calls"] for item in group_reports),
+                    "browser_time_ms": round(sum(item["browser_time_ms"] for item in group_reports), 3),
+                },
+            }
+        )
+
+    primitive_total_time_ms = sum(
+        float(episode_meta[episode["episode_id"]]["browser_time_ms"]) + episode["primitive_steps"] * decision_latency_ms
+        for group in groups
+        for episode in group["episodes"]
+    )
+    macro_total_time_ms = sum(float(episode["macro_total_time_ms"]) for group in groups for episode in group["episodes"])
+    return {
+        "summary": {
+            "policy_mode": "learned",
+            "action_scope": action_scope,
+            "use_start_step_guard": use_start_step_guard,
+            "episodes": total_episodes,
+            "success_rate": round(total_successes / total_episodes, 4) if total_episodes else 0.0,
+            "primitive_steps": total_primitive_steps,
+            "agent_decisions": total_agent_decisions,
+            "steps_saved": total_primitive_steps - total_agent_decisions,
+            "decision_reduction_ratio": round((total_primitive_steps - total_agent_decisions) / total_primitive_steps, 4)
+            if total_primitive_steps
+            else 0.0,
+            "attempted_macro_calls": total_attempted_macro_calls,
+            "successful_macro_calls": total_successful_macro_calls,
+            "failed_macro_calls": total_failed_macro_calls,
+            "macro_success_rate": round(total_successful_macro_calls / total_attempted_macro_calls, 4)
+            if total_attempted_macro_calls
+            else 0.0,
+            "browser_time_ms": round(total_browser_time_ms, 3),
+            "primitive_total_time_ms": round(primitive_total_time_ms, 3),
+            "macro_total_time_ms": round(macro_total_time_ms, 3),
+            "estimated_time_saved_ms": round(primitive_total_time_ms - macro_total_time_ms, 3),
+            "macro_hits": dict(macro_hits),
+        },
+        "training": {
+            "examples": len(training_examples),
+            "epochs": training_epochs,
+            "seed": training_seed,
+            "updates": int(model.get("updates", 0)),
+        },
+        "model": model,
         "groups": groups,
     }
 
