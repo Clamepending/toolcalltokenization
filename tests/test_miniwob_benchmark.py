@@ -1,12 +1,16 @@
 import unittest
 
 from toolcalltokenization.miniwob_benchmark import (
+    bind_macro_steps,
     build_click_button_sequence,
     build_form_sequence_2,
     build_form_sequence_3,
     build_login_user,
     build_use_autocomplete,
+    choose_macro,
     default_miniwob_url,
+    macro_action_string,
+    representative_templates_for_macro,
     render_action,
     task_name_for_env_id,
 )
@@ -87,6 +91,77 @@ class MiniwobBenchmarkTests(unittest.TestCase):
         self.assertEqual(render_action(steps[0]), "click('18')")
         self.assertEqual(render_action(steps[1]), "fill('21', '44')")
         self.assertEqual(render_action(steps[2]), "click('24')")
+
+    def test_bind_macro_steps_resolves_binding_ids(self):
+        macro = {
+            "step_templates": [
+                {"kind": "fill", "bid": "16", "target_role": "textbox", "target_label": "username", "binding_id": "B01"},
+                {"kind": "click", "bid": "20", "target_role": "button", "target_label": "login"},
+            ]
+        }
+        bound = bind_macro_steps(macro, {"B01": "cierra"})
+        self.assertEqual(bound[0]["value"], "cierra")
+        self.assertNotIn("binding_id", bound[0])
+        self.assertEqual(macro_action_string(macro, {"B01": "cierra"}), "fill('16', 'cierra')\nclick('20')")
+
+    def test_bind_macro_steps_requires_binding_value(self):
+        macro = {"step_templates": [{"kind": "fill", "bid": "16", "binding_id": "B01"}]}
+        with self.assertRaises(KeyError):
+            bind_macro_steps(macro, {})
+
+    def test_choose_macro_prefers_longer_high_precision_match(self):
+        macros = [
+            {"macro_id": "m1", "sequence": ["A", "B"], "replay_precision": 0.7, "support": 4, "trigger_prefix_len": 1},
+            {"macro_id": "m2", "sequence": ["A", "B", "C"], "replay_precision": 0.7, "support": 3, "trigger_prefix_len": 2},
+        ]
+        chosen = choose_macro(["A", "B", "C"], macros, policy_mode="oracle_exact", min_replay_precision=0.5)
+        self.assertEqual(chosen["macro_id"], "m2")
+
+    def test_choose_macro_uses_trigger_prefix_mode(self):
+        macros = [
+            {"macro_id": "m1", "sequence": ["A", "B", "C"], "replay_precision": 0.8, "support": 3, "trigger_prefix_len": 2}
+        ]
+        chosen = choose_macro(["A", "B", "X"], macros, policy_mode="trigger_prefix", min_replay_precision=0.5)
+        self.assertEqual(chosen["macro_id"], "m1")
+
+    def test_choose_macro_skips_blocked_macro_ids(self):
+        macros = [
+            {"macro_id": "m1", "sequence": ["A", "B"], "replay_precision": 0.8, "support": 3, "trigger_prefix_len": 1},
+            {"macro_id": "m2", "sequence": ["A", "C"], "replay_precision": 0.7, "support": 2, "trigger_prefix_len": 1},
+        ]
+        chosen = choose_macro(
+            ["A", "B"],
+            macros,
+            policy_mode="trigger_prefix",
+            min_replay_precision=0.5,
+            blocked_macro_ids=["m1"],
+        )
+        self.assertEqual(chosen["macro_id"], "m2")
+
+    def test_representative_templates_for_macro_finds_matching_episode_slice(self):
+        represented_rows = {
+            "episode_1": [
+                {
+                    "canonical_action": "TYPE user use=B01",
+                    "action_name": "fill",
+                    "selector": "16",
+                    "target_role": "textbox",
+                    "target_label": "username",
+                    "binding_uses": ["B01"],
+                },
+                {
+                    "canonical_action": "CLICK login",
+                    "action_name": "click",
+                    "selector": "20",
+                    "target_role": "button",
+                    "target_label": "login",
+                },
+            ]
+        }
+        macro = {"sequence": ["TYPE user use=B01", "CLICK login"]}
+        templates = representative_templates_for_macro(represented_rows, macro)
+        self.assertEqual(templates[0]["binding_id"], "B01")
+        self.assertEqual(templates[1]["kind"], "click")
 
 
 if __name__ == "__main__":

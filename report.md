@@ -1058,6 +1058,7 @@ For each task family:
 - mine per-task macros with `dataflow_coarse`
 - keep macros up to length `6`
 - evaluate held-out episodes by compressing the exact live primitive traces with the mined macros
+- replay held-out episodes live with promoted macros and primitive fallback
 
 This gives us:
 
@@ -1065,6 +1066,7 @@ This gives us:
 - real task success
 - real primitive traces
 - macro decision savings on held-out episodes
+- a first online estimate of macro-selection error
 
 #### Current live result
 
@@ -1110,6 +1112,96 @@ Representative examples:
 - `login_user`: `FILL(username) -> FILL(password) -> CLICK login`
 - `use_autocomplete`: `FILL(prefix) -> CLICK suggestion -> CLICK submit`
 
+#### Live macro-policy benchmark
+
+We now also have a dedicated live macro-policy runner:
+
+- `scripts/run_miniwob_macro_policy_benchmark.py`
+
+This benchmark reruns held-out MiniWoB episodes in BrowserGym and lets a macro policy choose between promoted macros and primitive fallback.
+
+Important implementation detail:
+
+- the first version tried to execute a macro from a representative episode template
+- that exposed a real grounding failure mode, because frozen BrowserGym element IDs can change across seeds
+- the benchmark now executes the **current episode's grounded primitive slice** once a macro is selected
+- this isolates macro-selection quality from stale-template grounding noise
+
+That change matters because the earlier success drop was mostly a runtime grounding bug, not evidence that the macro itself was wrong.
+
+We now have three useful MiniWoB comparison points.
+
+1. **Replay upper bound**
+   This is the original stable benchmark:
+   `80 -> 32` decisions, `0.60` reduction ratio, `1.0` success.
+
+2. **Per-task live macro policy**
+   Each task family gets its own small macro action space.
+
+   Best current result:
+   - artifact: `outputs/miniwob_live_v3_policy_oracle_v2_macro_policy_benchmark.json`
+   - held-out episodes: `32`
+   - success rate: `1.0`
+   - primitive decisions: `80`
+   - agent decisions: `32`
+   - decisions saved: `48`
+   - decision reduction ratio: `0.60`
+   - macro attempts: `32`
+   - successful macro calls: `32`
+   - failed macro calls: `0`
+
+   The `2`-step `trigger_prefix` policy matches this result exactly on the stable per-task setup:
+   `outputs/miniwob_live_v3_policy_trigger_v2_macro_policy_benchmark.json`
+
+   Interpretation:
+   - for clean, well-separated task families, the macro selector is not the bottleneck
+   - once a task-local macro library exists, a simple trigger rule can recover the full upper bound
+
+3. **Global live macro policy**
+   All stable MiniWoB tasks share one action space, which is a better proxy for a real agent with one macro vocabulary.
+
+   Exact-policy result:
+   - artifact: `outputs/miniwob_live_v3_global_oracle_macro_policy_benchmark.json`
+   - held-out episodes: `32`
+   - success rate: `1.0`
+   - primitive decisions: `83`
+   - agent decisions: `48`
+   - decisions saved: `35`
+   - decision reduction ratio: `0.4217`
+   - macro attempts: `23`
+   - successful macro calls: `23`
+   - failed macro calls: `0`
+
+   Clean `2`-step trigger result:
+   - artifact: `outputs/miniwob_live_v3_global_trigger_macro_policy_benchmark.json`
+   - effectively identical to the exact global result on this benchmark
+
+   Loose `1`-step trigger result:
+   - artifact: `outputs/miniwob_live_v3_global_trigger_p1_v2_macro_policy_benchmark.json`
+   - held-out episodes: `32`
+   - success rate: `1.0`
+   - primitive decisions: `83`
+   - agent decisions: `63`
+   - decisions saved: `20`
+   - decision reduction ratio: `0.241`
+   - macro attempts: `35`
+   - successful macro calls: `23`
+   - failed macro calls: `12`
+   - macro success rate: `0.6571`
+
+   Interpretation:
+   - broadening to one shared action space already cuts savings from `0.60` to `0.4217`
+   - loosening the trigger from `2` steps to `1` step cuts savings again to `0.241`
+   - success stays perfect here because primitive fallback is working
+   - the main tax is not catastrophic failure, but wasted agent decisions on false macro triggers
+
+This is the clearest live evidence so far that:
+
+- macro execution can work cleanly online
+- shared action spaces are much harder than per-task local ones
+- trigger precision matters a lot once multiple macros compete
+- primitive fallback is essential
+
 #### Interpretation
 
 This is the strongest result in the repo so far.
@@ -1128,26 +1220,31 @@ It also sharpens the research picture:
 
 #### Important caveat
 
-This MiniWoB benchmark is **not yet an on-policy macro-selection benchmark**.
+This MiniWoB benchmark is now **partly on-policy**, but it is still not an LLM-driven browser agent.
 
 Right now:
 
-- the primitive solver is scripted
-- the macro-aware condition compresses the scripted primitive trace on held-out episodes
-- browser actions executed are still the same primitive actions under the hood
+- the primitive solver is still scripted
+- the live macro policy chooses among promoted macros plus primitive fallback
+- the benchmark uses the scripted plan as the underlying grounded action source
 - the time savings come from fewer agent decisions, not faster DOM interaction
 
 So this result should be read as:
 
-- a strong live-browser estimate of the upside of macros
-- not yet a complete measurement of macro-triggering intelligence
+- a real live-browser macro-selection benchmark
+- but still a controlled benchmark where task grounding is scripted rather than model-generated
 
-That is still useful, because it cleanly separates two questions:
+That is still useful, because it separates three questions:
 
 1. If a controller can call the right macro, is there meaningful live-browser upside?
-2. How much of that upside survives when macro choice is learned online?
+2. How much of that upside survives once macros compete inside a shared action space?
+3. How quickly does loose triggering waste the upside through false attempts?
 
-For MiniWoB, question `1` now looks clearly positive.
+For MiniWoB, all three now have concrete answers:
+
+- yes, the upside is large in clean local settings
+- some of it survives under a global action space
+- loose triggering can burn roughly half of the remaining gain even without hurting task success
 
 #### BrowserGym / WorkArena blockers
 

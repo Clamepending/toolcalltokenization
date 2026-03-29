@@ -132,6 +132,15 @@ MINIWOB_URL="file:///Users/mark/Desktop/projects/toolcalltokenization/data/local
   --output-prefix outputs/miniwob_live_v3 \
   --episodes-per-task 20 \
   --headless
+
+./.venvbg/bin/python scripts/run_miniwob_macro_policy_benchmark.py \
+  --input-prefix outputs/miniwob_live_v3 \
+  --output-prefix outputs/miniwob_live_v3_global_trigger_p1_v2 \
+  --exclude-task-name click_button_sequence \
+  --group-by website \
+  --headless \
+  --policy-mode trigger_prefix \
+  --trigger-prefix-len 1
 ```
 
 To sweep action representations instead of using just one canonical form, rerun
@@ -167,6 +176,7 @@ To measure utility instead of just discovery:
 - use `export_action_space.py` to combine primitives plus promoted macros into one action vocabulary
 - use `simulate_macro_agent.py` to estimate what a macro-aware agent would save once failed macro attempts and primitive fallback are included
 - use `run_playwright_action.py` to execute one primitive or macro action in a real browser with Playwright tracing
+- use `run_miniwob_macro_policy_benchmark.py` to replay held-out MiniWoB episodes live with macro selection, primitive fallback, and decision-side timing estimates
 
 The current savings numbers are still **decision-side estimates**, not real browser wall-clock timings. Real wall-clock measurements will need a controlled online benchmark.
 
@@ -187,7 +197,11 @@ Current best public-data finding:
 - the first public BrowserGym benchmark now works in a separate Python `3.11` env via [run_miniwob_live_benchmark.py](/Users/mark/Desktop/projects/toolcalltokenization/scripts/run_miniwob_live_benchmark.py)
 - on the stable held-out subset of the 20-seed MiniWoB live run, macros reduce decisions from `80` to `32`, a `0.60` decision reduction ratio, while keeping success at `1.0`, in [miniwob_live_v3_stable_benchmark.json](/Users/mark/Desktop/projects/toolcalltokenization/outputs/miniwob_live_v3_stable_benchmark.json)
 - the learned MiniWoB live registry contains `17` promoted macros, `15` of them parameterized, in [miniwob_live_v3_macro_registry.json](/Users/mark/Desktop/projects/toolcalltokenization/outputs/miniwob_live_v3_macro_registry.json)
-- the current caveat is that MiniWoB uses perfect macro selection over held-out primitive traces, so it is an upper-bound live benchmark on macro utility rather than a full on-policy macro-calling agent
+- the new live macro-policy runner is [run_miniwob_macro_policy_benchmark.py](/Users/mark/Desktop/projects/toolcalltokenization/scripts/run_miniwob_macro_policy_benchmark.py), and it can execute promoted macros online with primitive fallback
+- under a per-task action space, the live `oracle_exact` and `2`-step `trigger_prefix` policies both match the upper bound on the stable subset: `80 -> 32` decisions, `0.60` reduction ratio, `1.0` success, in [miniwob_live_v3_policy_oracle_v2_macro_policy_benchmark.json](/Users/mark/Desktop/projects/toolcalltokenization/outputs/miniwob_live_v3_policy_oracle_v2_macro_policy_benchmark.json) and [miniwob_live_v3_policy_trigger_v2_macro_policy_benchmark.json](/Users/mark/Desktop/projects/toolcalltokenization/outputs/miniwob_live_v3_policy_trigger_v2_macro_policy_benchmark.json)
+- under a single global MiniWoB action space, the exact / clean `2`-step policy drops to `83 -> 48` decisions, a `0.4217` reduction ratio, still with `1.0` success, in [miniwob_live_v3_global_oracle_macro_policy_benchmark.json](/Users/mark/Desktop/projects/toolcalltokenization/outputs/miniwob_live_v3_global_oracle_macro_policy_benchmark.json)
+- loosening the global trigger to `1` step keeps success at `1.0` but drops savings to `83 -> 63` decisions, a `0.241` reduction ratio, with `12` false macro triggers and `0.6571` macro success, in [miniwob_live_v3_global_trigger_p1_v2_macro_policy_benchmark.json](/Users/mark/Desktop/projects/toolcalltokenization/outputs/miniwob_live_v3_global_trigger_p1_v2_macro_policy_benchmark.json)
+- the key new lesson is that macro utility is real, but loose global triggering burns a noticeable fraction of the upside even on simple MiniWoB tasks
 
 ## Why this starts offline
 
