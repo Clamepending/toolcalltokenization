@@ -40,6 +40,11 @@ def build_summary() -> dict:
     miniwob_global_trigger1 = load_json(ROOT / "outputs" / "miniwob_live_v3_global_trigger_p1_v3_macro_policy_benchmark.json")
     miniwob_global_trigger1_r06 = load_json(ROOT / "outputs" / "miniwob_live_v3_global_trigger_p1_r06_macro_policy_benchmark.json")
     miniwob_global_trigger1_r10 = load_json(ROOT / "outputs" / "miniwob_live_v3_global_trigger_p1_r10_macro_policy_benchmark.json")
+    miniwob_global_taskregistry_oracle = load_json(ROOT / "outputs" / "miniwob_live_v3_global_taskregistry_oracle_stable_macro_policy_benchmark.json")
+    miniwob_global_taskregistry_trigger = load_json(ROOT / "outputs" / "miniwob_live_v3_global_taskregistry_trigger_stable_macro_policy_benchmark.json")
+    miniwob_semantic_global_noguard = load_json(ROOT / "outputs" / "miniwob_live_v3_semantic_global_noguard_stable_m0_semantic_policy_benchmark.json")
+    miniwob_semantic_global_guard = load_json(ROOT / "outputs" / "miniwob_live_v3_semantic_global_guard_v3_stable_m0_semantic_policy_benchmark.json")
+    miniwob_semantic_global_guard_bias = load_json(ROOT / "outputs" / "miniwob_live_v3_semantic_global_guard_v4_stable_mneg1_semantic_policy_benchmark.json")
     trigger1_registry = load_json(ROOT / "outputs" / "miniwob_live_v3_global_trigger_p1_v3_macro_registry.json")
 
     mind2web_covered_steps = sum(
@@ -86,6 +91,11 @@ def build_summary() -> dict:
             "miniwob_global_exact": miniwob_global_exact["summary"],
             "miniwob_global_trigger2": miniwob_global_trigger2["summary"],
             "miniwob_global_trigger1": miniwob_global_trigger1["summary"],
+            "miniwob_global_taskregistry_oracle": miniwob_global_taskregistry_oracle["summary"],
+            "miniwob_global_taskregistry_trigger": miniwob_global_taskregistry_trigger["summary"],
+            "miniwob_semantic_global_noguard": miniwob_semantic_global_noguard["summary"],
+            "miniwob_semantic_global_guard": miniwob_semantic_global_guard["summary"],
+            "miniwob_semantic_global_guard_bias": miniwob_semantic_global_guard_bias["summary"],
         },
         "mind2web_hierarchy_sweep": mind2web_hierarchy["variants"],
         "global_trigger_sweep": [
@@ -94,6 +104,13 @@ def build_summary() -> dict:
             {"label": "Global 1-step r>=0.5", **miniwob_global_trigger1["summary"]},
             {"label": "Global 1-step r>=0.6", **miniwob_global_trigger1_r06["summary"]},
             {"label": "Global 1-step r=1.0", **miniwob_global_trigger1_r10["summary"]},
+        ],
+        "semantic_policy_sweep": [
+            {"label": "Semantic no guard", **miniwob_semantic_global_noguard["summary"]},
+            {"label": "Semantic + guard", **miniwob_semantic_global_guard["summary"]},
+            {"label": "Semantic + guard + macro bias", **miniwob_semantic_global_guard_bias["summary"]},
+            {"label": "Prefix 2-step", **miniwob_global_taskregistry_trigger["summary"]},
+            {"label": "Exact upper bound", **miniwob_global_taskregistry_oracle["summary"]},
         ],
         "global_trigger_failures": {
             "failed_by_macro": failed_by_macro,
@@ -302,6 +319,46 @@ def plot_failure_attribution(summary: dict) -> Path:
     return output
 
 
+def plot_semantic_policy_sweep(summary: dict) -> Path:
+    sweep = summary["semantic_policy_sweep"]
+    labels = [item["label"] for item in sweep]
+    reductions = [percent(item["decision_reduction_ratio"]) for item in sweep]
+    macro_success = [percent(item.get("macro_success_rate", 0.0)) for item in sweep]
+    failed_calls = [int(item.get("failed_macro_calls", 0)) for item in sweep]
+
+    fig, axes = plt.subplots(2, 1, figsize=(10.4, 7.2), sharex=True, gridspec_kw={"height_ratios": [2, 1.5]})
+    colors = ["#b23a48", "#457b9d", "#2a9d8f", "#4d908e", "#6a994e"]
+
+    bars = axes[0].bar(labels, reductions, color=colors)
+    axes[0].set_ylabel("Decision Reduction (%)")
+    axes[0].set_title("Semantic Names Need Structural Guarding; With It, They Reach the Shared-Vocabulary Upper Bound")
+    ymin = min(0, min(reductions) * 1.2)
+    ymax = max(reductions) * 1.2
+    axes[0].set_ylim(ymin, ymax)
+    axes[0].grid(axis="y", alpha=0.25)
+    for bar, value in zip(bars, reductions):
+        offset = 1.0 if value >= 0 else -2.0
+        va = "bottom" if value >= 0 else "top"
+        axes[0].text(bar.get_x() + bar.get_width() / 2, value + offset, f"{value:.1f}%", ha="center", va=va)
+
+    axes[1].bar(labels, failed_calls, color="#e76f51", alpha=0.85, label="Failed macro calls")
+    axes[1].set_ylabel("Failed Macro Calls")
+    axes[1].grid(axis="y", alpha=0.25)
+    twin = axes[1].twinx()
+    twin.plot(labels, macro_success, color="#264653", marker="o", linewidth=2, label="Macro success rate")
+    twin.set_ylabel("Macro Success (%)")
+    twin.set_ylim(0, 110)
+    for idx, value in enumerate(macro_success):
+        twin.text(idx, value + 3, f"{value:.1f}%", ha="center", va="bottom", color="#264653", fontsize=9)
+
+    axes[1].tick_params(axis="x", rotation=16)
+    fig.tight_layout()
+    output = DOCS_FIGURES / "miniwob_semantic_policy_sweep.svg"
+    fig.savefig(output, bbox_inches="tight")
+    plt.close(fig)
+    return output
+
+
 def main() -> None:
     DOCS_DATA.mkdir(parents=True, exist_ok=True)
     DOCS_FIGURES.mkdir(parents=True, exist_ok=True)
@@ -313,6 +370,7 @@ def main() -> None:
         "mind2web_hierarchy": str(plot_mind2web_hierarchy(summary)),
         "global_sweep": str(plot_global_sweep(summary)),
         "failure_attribution": str(plot_failure_attribution(summary)),
+        "semantic_policy_sweep": str(plot_semantic_policy_sweep(summary)),
     }
     dump_json(str(DOCS_DATA / "action_chunking_figures.json"), outputs)
 

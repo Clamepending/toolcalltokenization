@@ -14,14 +14,14 @@ if str(ROOT) not in sys.path:
 from toolcalltokenization.miniwob_benchmark import (
     build_group_registry,
     default_miniwob_url,
-    evaluate_live_macro_policy_benchmark,
+    evaluate_live_semantic_policy_benchmark,
 )
 from toolcalltokenization.trace_utils import dump_json, load_jsonl
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Run a live MiniWoB macro-policy benchmark from saved traces and episodes."
+        description="Run a live MiniWoB semantic macro-policy benchmark from saved traces and episodes."
     )
     parser.add_argument("--input-prefix", required=True, help="Prefix for *_traces.jsonl and *_trace_summary.json.")
     parser.add_argument("--output-prefix", required=True, help="Prefix for benchmark outputs.")
@@ -38,9 +38,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--min-length", type=int, default=2, help="Minimum macro length to keep.")
     parser.add_argument("--min-registry-replay-precision", type=float, default=0.5, help="Minimum held-out replay precision required to keep a macro in the rebuilt registry.")
     parser.add_argument("--trigger-prefix-len", type=int, default=2, help="Leading-step trigger length used for held-out registry evaluation.")
-    parser.add_argument("--policy-mode", choices=("oracle_exact", "trigger_prefix"), default="oracle_exact", help="Live macro selection policy.")
-    parser.add_argument("--action-scope", choices=("task", "global"), default="task", help="Whether the live policy sees only task-local macros or one shared global action space.")
-    parser.add_argument("--min-policy-replay-precision", type=float, default=0.5, help="Minimum macro replay precision required at live selection time.")
+    parser.add_argument("--action-scope", choices=("task", "global"), default="task", help="Whether semantic selection sees only task-local macros or one shared global action space.")
+    parser.add_argument("--margin", type=float, default=0.0, help="Minimum score advantage required before selecting a macro over the current primitive step.")
+    parser.add_argument("--no-start-step-guard", action="store_true", help="Disable the first-step structural compatibility guard for semantic macro selection.")
     parser.add_argument("--decision-latency-ms", type=int, default=1000, help="Estimated agent decision latency added on top of browser time.")
     parser.add_argument("--headless", action="store_true", help="Run BrowserGym in headless mode.")
     parser.add_argument("--miniwob-url", default="", help="Optional MiniWoB base URL. Defaults to the local clone in data/local/miniwob-plusplus.")
@@ -111,7 +111,7 @@ def main() -> None:
         dump_json(registry_path, registry)
 
     miniwob_url = args.miniwob_url or default_miniwob_url(ROOT)
-    benchmark = evaluate_live_macro_policy_benchmark(
+    benchmark = evaluate_live_semantic_policy_benchmark(
         rows,
         episodes,
         registry,
@@ -122,10 +122,10 @@ def main() -> None:
         decision_latency_ms=args.decision_latency_ms,
         headless=args.headless,
         miniwob_url=miniwob_url,
-        policy_mode=args.policy_mode,
-        min_replay_precision=args.min_policy_replay_precision,
-        launch_retries=args.launch_retries,
         action_scope=args.action_scope,
+        margin=args.margin,
+        launch_retries=args.launch_retries,
+        use_start_step_guard=not args.no_start_step_guard,
     )
     benchmark["collection"] = {
         "input_prefix": str(input_prefix),
@@ -135,7 +135,7 @@ def main() -> None:
         "rows": len(rows),
         "miniwob_url": miniwob_url,
     }
-    dump_json(str(output_prefix.with_name(output_prefix.name + "_macro_policy_benchmark.json")), benchmark)
+    dump_json(str(output_prefix.with_name(output_prefix.name + "_semantic_policy_benchmark.json")), benchmark)
 
 
 if __name__ == "__main__":

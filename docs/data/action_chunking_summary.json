@@ -299,6 +299,48 @@
       "success_rate": 1.0,
       "successful_macro_calls": 23
     },
+    "miniwob_global_taskregistry_oracle": {
+      "action_scope": "global",
+      "agent_decisions": 32,
+      "attempted_macro_calls": 32,
+      "browser_time_ms": 61669.685,
+      "decision_reduction_ratio": 0.6,
+      "episodes": 32,
+      "estimated_time_saved_ms": 47877.499,
+      "failed_macro_calls": 0,
+      "macro_hits": {
+        "M001": 32
+      },
+      "macro_success_rate": 1.0,
+      "macro_total_time_ms": 93669.684,
+      "policy_mode": "oracle_exact",
+      "primitive_steps": 80,
+      "primitive_total_time_ms": 141547.183,
+      "steps_saved": 48,
+      "success_rate": 1.0,
+      "successful_macro_calls": 32
+    },
+    "miniwob_global_taskregistry_trigger": {
+      "action_scope": "global",
+      "agent_decisions": 32,
+      "attempted_macro_calls": 32,
+      "browser_time_ms": 61712.351,
+      "decision_reduction_ratio": 0.6,
+      "episodes": 32,
+      "estimated_time_saved_ms": 47834.831,
+      "failed_macro_calls": 0,
+      "macro_hits": {
+        "M001": 32
+      },
+      "macro_success_rate": 1.0,
+      "macro_total_time_ms": 93712.352,
+      "policy_mode": "trigger_prefix",
+      "primitive_steps": 80,
+      "primitive_total_time_ms": 141547.183,
+      "steps_saved": 48,
+      "success_rate": 1.0,
+      "successful_macro_calls": 32
+    },
     "miniwob_global_trigger1": {
       "agent_decisions": 63,
       "attempted_macro_calls": 35,
@@ -367,6 +409,75 @@
       "success_rate": 1.0,
       "successful_macro_calls": 32
     },
+    "miniwob_semantic_global_guard": {
+      "action_scope": "global",
+      "agent_decisions": 36,
+      "attempted_macro_calls": 28,
+      "browser_time_ms": 61991.014,
+      "decision_reduction_ratio": 0.55,
+      "episodes": 32,
+      "estimated_time_saved_ms": 43556.169,
+      "failed_macro_calls": 0,
+      "macro_hits": {
+        "M001": 28
+      },
+      "macro_success_rate": 1.0,
+      "macro_total_time_ms": 97991.014,
+      "margin": 0.0,
+      "policy_mode": "semantic",
+      "primitive_steps": 80,
+      "primitive_total_time_ms": 141547.183,
+      "steps_saved": 44,
+      "success_rate": 1.0,
+      "successful_macro_calls": 28,
+      "use_start_step_guard": true
+    },
+    "miniwob_semantic_global_guard_bias": {
+      "action_scope": "global",
+      "agent_decisions": 32,
+      "attempted_macro_calls": 32,
+      "browser_time_ms": 61949.628,
+      "decision_reduction_ratio": 0.6,
+      "episodes": 32,
+      "estimated_time_saved_ms": 47597.555,
+      "failed_macro_calls": 0,
+      "macro_hits": {
+        "M001": 32
+      },
+      "macro_success_rate": 1.0,
+      "macro_total_time_ms": 93949.628,
+      "margin": -1.0,
+      "policy_mode": "semantic",
+      "primitive_steps": 80,
+      "primitive_total_time_ms": 141547.183,
+      "steps_saved": 48,
+      "success_rate": 1.0,
+      "successful_macro_calls": 32,
+      "use_start_step_guard": true
+    },
+    "miniwob_semantic_global_noguard": {
+      "action_scope": "global",
+      "agent_decisions": 120,
+      "attempted_macro_calls": 92,
+      "browser_time_ms": 61893.32,
+      "decision_reduction_ratio": -0.5,
+      "episodes": 32,
+      "estimated_time_saved_ms": -40346.138,
+      "failed_macro_calls": 72,
+      "macro_hits": {
+        "M001": 20
+      },
+      "macro_success_rate": 0.2174,
+      "macro_total_time_ms": 181893.321,
+      "margin": 0.0,
+      "policy_mode": "semantic",
+      "primitive_steps": 80,
+      "primitive_total_time_ms": 141547.183,
+      "steps_saved": -40,
+      "success_rate": 1.0,
+      "successful_macro_calls": 20,
+      "use_start_step_guard": false
+    },
     "miniwob_stable_replay_upper_bound": {
       "browser_time_ms": 61547.183,
       "decision_reduction_ratio": 0.6,
@@ -379,5 +490,123 @@
       "steps_saved": 48,
       "success_rate": 1.0
     }
-  }
+  },
+  "semantic_policy_sweep": [
+    {
+      "action_scope": "global",
+      "agent_decisions": 120,
+      "attempted_macro_calls": 92,
+      "browser_time_ms": 61893.32,
+      "decision_reduction_ratio": -0.5,
+      "episodes": 32,
+      "estimated_time_saved_ms": -40346.138,
+      "failed_macro_calls": 72,
+      "label": "Semantic no guard",
+      "macro_hits": {
+        "M001": 20
+      },
+      "macro_success_rate": 0.2174,
+      "macro_total_time_ms": 181893.321,
+      "margin": 0.0,
+      "policy_mode": "semantic",
+      "primitive_steps": 80,
+      "primitive_total_time_ms": 141547.183,
+      "steps_saved": -40,
+      "success_rate": 1.0,
+      "successful_macro_calls": 20,
+      "use_start_step_guard": false
+    },
+    {
+      "action_scope": "global",
+      "agent_decisions": 36,
+      "attempted_macro_calls": 28,
+      "browser_time_ms": 61991.014,
+      "decision_reduction_ratio": 0.55,
+      "episodes": 32,
+      "estimated_time_saved_ms": 43556.169,
+      "failed_macro_calls": 0,
+      "label": "Semantic + guard",
+      "macro_hits": {
+        "M001": 28
+      },
+      "macro_success_rate": 1.0,
+      "macro_total_time_ms": 97991.014,
+      "margin": 0.0,
+      "policy_mode": "semantic",
+      "primitive_steps": 80,
+      "primitive_total_time_ms": 141547.183,
+      "steps_saved": 44,
+      "success_rate": 1.0,
+      "successful_macro_calls": 28,
+      "use_start_step_guard": true
+    },
+    {
+      "action_scope": "global",
+      "agent_decisions": 32,
+      "attempted_macro_calls": 32,
+      "browser_time_ms": 61949.628,
+      "decision_reduction_ratio": 0.6,
+      "episodes": 32,
+      "estimated_time_saved_ms": 47597.555,
+      "failed_macro_calls": 0,
+      "label": "Semantic + guard + macro bias",
+      "macro_hits": {
+        "M001": 32
+      },
+      "macro_success_rate": 1.0,
+      "macro_total_time_ms": 93949.628,
+      "margin": -1.0,
+      "policy_mode": "semantic",
+      "primitive_steps": 80,
+      "primitive_total_time_ms": 141547.183,
+      "steps_saved": 48,
+      "success_rate": 1.0,
+      "successful_macro_calls": 32,
+      "use_start_step_guard": true
+    },
+    {
+      "action_scope": "global",
+      "agent_decisions": 32,
+      "attempted_macro_calls": 32,
+      "browser_time_ms": 61712.351,
+      "decision_reduction_ratio": 0.6,
+      "episodes": 32,
+      "estimated_time_saved_ms": 47834.831,
+      "failed_macro_calls": 0,
+      "label": "Prefix 2-step",
+      "macro_hits": {
+        "M001": 32
+      },
+      "macro_success_rate": 1.0,
+      "macro_total_time_ms": 93712.352,
+      "policy_mode": "trigger_prefix",
+      "primitive_steps": 80,
+      "primitive_total_time_ms": 141547.183,
+      "steps_saved": 48,
+      "success_rate": 1.0,
+      "successful_macro_calls": 32
+    },
+    {
+      "action_scope": "global",
+      "agent_decisions": 32,
+      "attempted_macro_calls": 32,
+      "browser_time_ms": 61669.685,
+      "decision_reduction_ratio": 0.6,
+      "episodes": 32,
+      "estimated_time_saved_ms": 47877.499,
+      "failed_macro_calls": 0,
+      "label": "Exact upper bound",
+      "macro_hits": {
+        "M001": 32
+      },
+      "macro_success_rate": 1.0,
+      "macro_total_time_ms": 93669.684,
+      "policy_mode": "oracle_exact",
+      "primitive_steps": 80,
+      "primitive_total_time_ms": 141547.183,
+      "steps_saved": 48,
+      "success_rate": 1.0,
+      "successful_macro_calls": 32
+    }
+  ]
 }

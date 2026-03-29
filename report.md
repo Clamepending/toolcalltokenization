@@ -1243,6 +1243,81 @@ So the next design decision is clear:
 - prefer workflow-local or state-local registries over blindly global ones
 - only expose generic macros if their trigger conditions are also much richer
 
+![Semantic MiniWoB policy sweep](docs/figures/miniwob_semantic_policy_sweep.svg)
+
+This figure answers the next obvious question: can we let an agent choose macros by their names and descriptions instead of relying on hidden exact-match logic?
+
+Using the same shared MiniWoB action space of promoted macros:
+
+- semantic names/descriptions alone are **not** enough
+  - on the stable held-out slice they turn `80 -> 120` decisions
+  - that is a `-50%` reduction, meaning a `50%` increase in decisions
+  - the agent keeps task success at `1.0` only because primitive fallback bails it out after `72` failed macro attempts
+- adding a lightweight **first-step structural guard** changes the picture completely
+  - `80 -> 36` decisions
+  - `55%` decision reduction
+  - `0` failed macro attempts
+  - `1.0` success
+- adding a small **macro bias** when scores are close closes the remaining gap
+  - `80 -> 32` decisions
+  - `60%` decision reduction
+  - `0` failed macro attempts
+  - `1.0` success
+
+That last number matches the shared-vocabulary exact/prefix upper bound on this stable benchmark.
+
+So the current result is:
+
+- semantic packaging can work
+- but only when macro selection is still constrained by a lightweight structural precondition
+- names and descriptions alone are too ambiguous in a shared browser action space
+
+#### Semantic Macro Selection With Named Actions
+
+To move beyond the earlier hard-coded prefix policy, we added:
+
+- `scripts/run_miniwob_semantic_policy_benchmark.py`
+- semantic macro naming and description generation in `toolcalltokenization/miniwob_benchmark.py`
+- a live semantic policy that chooses between:
+  - the current primitive action
+  - any available promoted macro in the action space
+
+The current semantic scorer is intentionally simple:
+
+- lexical overlap between the task goal / observation text and the action name / description
+- a small macro-length prior
+- optional first-step compatibility guard
+- optional macro bias when scores are close
+
+This is not an LLM policy yet, but it is a real step beyond the earlier hidden trigger estimate:
+
+- the controller only sees named actions plus current observation text
+- it no longer uses hidden future-prefix matching to decide whether to call a macro
+- macro expansion still uses primitive fallback if the call is wrong
+
+The main qualitative finding is that the hard part is **selection ambiguity**, not macro execution:
+
+- the same named macro can look semantically plausible in the wrong task
+- once we require the current action context to be compatible with the macro's first step, most of the ambiguity disappears
+- after that, the remaining gap is small calibration, not a catastrophic failure of the approach
+
+On the stable shared MiniWoB action space, the clean comparison is now:
+
+1. Semantic, no guard:
+   `80 -> 120` decisions, `72` failed macro attempts, `1.0` success
+2. Semantic + first-step guard:
+   `80 -> 36` decisions, `0` failed macro attempts, `1.0` success
+3. Semantic + first-step guard + slight macro bias:
+   `80 -> 32` decisions, `0` failed macro attempts, `1.0` success
+4. Shared-vocabulary exact / 2-step upper bound:
+   `80 -> 32` decisions, `0` failed macro attempts, `1.0` success
+
+This is the strongest current evidence that the "real agent with named macro tools" direction is plausible:
+
+- even a weak semantic chooser can recover nearly all of the benefit
+- but only if the action space is paired with explicit, cheap macro preconditions
+- this supports building a true LLM-driven action chooser next, because the guardrails seem to matter more than the exact ranking model
+
 #### Interpretation
 
 This is the strongest result in the repo so far.
@@ -1253,6 +1328,7 @@ It tells us:
 - the low `~2%` Mind2Web macro-agent result was mostly a coverage problem, not a proof that macros are unhelpful
 - when coverage is dense and task families are tight, live decision savings can be large
 - `2`-step and `3`-step workflow macros are already enough to remove around `60%` of decisions on held-out browser episodes
+- named macro tools can be selected successfully in a shared action space, but only with lightweight structural guarding
 
 It also sharpens the research picture:
 
@@ -1286,6 +1362,7 @@ For MiniWoB, all three now have concrete answers:
 - yes, the upside is large in clean local settings
 - some of it survives under a global action space
 - loose triggering can burn roughly half of the remaining gain even without hurting task success
+- semantic names help only after we add start-step preconditions; without those guardrails, the agent over-calls macros badly
 
 #### Current decisions
 
@@ -1300,13 +1377,16 @@ These are the current project decisions based on the evidence above.
 3. Treat a **shared action space with strong triggers** as the main realistic benchmark condition.
    Right now, global MiniWoB with a `2`-step trigger is the closest thing we have to a credible online baseline.
 
-4. Prefer **better triggering** over **stricter promotion thresholds**.
+4. Treat **semantic tool selection + structural preconditions** as the next realistic controller.
+   The new semantic MiniWoB benchmark shows that names/descriptions can work, but only when macro calls are masked by cheap first-step compatibility checks.
+
+5. Prefer **better triggering** over **stricter promotion thresholds**.
    The trigger sweep shows that replay-threshold tightening alone cannot recover the gain lost by a loose trigger.
 
-5. Keep **primitive fallback** in the loop.
+6. Keep **primitive fallback** in the loop.
    It is the reason the loose-trigger setting still keeps task success at `1.0` despite wasted decisions.
 
-6. For the next benchmark jump, prioritize **state-aware preconditions** over more mining sophistication.
+7. For the next benchmark jump, prioritize **state-aware preconditions** over more mining sophistication.
    The main remaining loss is now selection ambiguity, not inability to discover chunks.
 
 #### BrowserGym / WorkArena blockers
@@ -1417,6 +1497,39 @@ This figure communicates the current Mind2Web design choice:
 - task-family fallback is not currently worth the extra ambiguity
 
 These are still offline or replay-style measurements. The latency numbers are **decision-side estimates**, not real browser wall-clock timings.
+
+### Why `50%` Is Still Hard on Broad Web Data
+
+The current Mind2Web numbers are much smaller than the MiniWoB live numbers for a simple reason:
+
+overall savings are roughly
+
+- coverage of held-out steps where we have a usable macro
+- multiplied by savings inside those covered regions
+- minus the ambiguity tax from calling the wrong macro
+
+Right now the best public Mind2Web setting still has:
+
+- only `26.63%` held-out-step coverage
+- short promoted macros, usually length `2-3`
+- mixed site layouts that fragment longer workflows
+- little page-state context at trigger time
+
+So even though there is real redundancy, it does not yet translate into anything like `50%` overall savings.
+
+MiniWoB reaches `55-60%` because:
+
+- coverage is effectively dense
+- workflows are repeated nearly identically
+- the start-state ambiguity is low
+- one small promoted macro often covers most of the episode
+
+Mind2Web does not yet have those properties.
+
+The practical implication is:
+
+- if we want `50%`-scale savings on broader browser benchmarks, we need much better coverage and stronger page-state-aware macro masks
+- simply mining more chunks from the current data is unlikely to be enough
 
 Current results for `dataflow_coarse`:
 

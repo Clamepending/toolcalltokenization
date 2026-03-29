@@ -10,8 +10,14 @@ from toolcalltokenization.miniwob_benchmark import (
     choose_macro,
     default_miniwob_url,
     macro_action_string,
+    observation_text,
+    primitive_action_description,
+    primitive_action_name,
     representative_templates_for_macro,
     render_action,
+    semantic_choice,
+    semantic_macro_description,
+    semantic_macro_name,
     task_name_for_env_id,
 )
 
@@ -162,6 +168,89 @@ class MiniwobBenchmarkTests(unittest.TestCase):
         templates = representative_templates_for_macro(represented_rows, macro)
         self.assertEqual(templates[0]["binding_id"], "B01")
         self.assertEqual(templates[1]["kind"], "click")
+
+    def test_semantic_macro_name_and_description_are_readable(self):
+        macro = {"sequence": ["FILL|role=input|label=password|use=B01", "CLICK|role=button|label=login"]}
+        name = semantic_macro_name("login_user", macro, 1)
+        description = semantic_macro_description("login_user", macro)
+        self.assertIn("login_user", name)
+        self.assertIn("password", name)
+        self.assertIn("username and password", description)
+
+    def test_primitive_action_metadata_is_readable(self):
+        step = {"kind": "fill", "bid": "16", "target_role": "textbox", "target_label": "password"}
+        self.assertIn("password", primitive_action_name(step, 0))
+        self.assertIn("password", primitive_action_description(step))
+
+    def test_observation_text_collects_goal_and_ax_names(self):
+        obs = {
+            "goal": 'Enter the password "11L" and submit.',
+            "axtree_object": {"nodes": [ax_node("20", "button", "Submit"), ax_node("16", "textbox", "Password")]},
+        }
+        text = observation_text(obs)
+        self.assertIn("submit", text.lower())
+        self.assertIn("password", text.lower())
+
+    def test_semantic_choice_prefers_matching_macro(self):
+        obs = {"goal": 'Enter the username "alice" and password "pw" and press login.', "axtree_object": {"nodes": [ax_node("20", "button", "Login")]}}
+        primitive = {"kind": "fill", "bid": "16", "target_role": "textbox", "target_label": "username"}
+        macro = {
+            "macro_id": "M1",
+            "suggested_name": "login_user_fill_username_then_fill_password_then_click_login_m001",
+            "suggested_description": "Fill the username and password fields, then click login.",
+            "sequence": ["FILL|role=input|label=<TEXT>|use=B01", "FILL|role=input|label=password|use=B02", "CLICK|role=button|label=login"],
+            "step_templates": [
+                {"kind": "fill", "target_role": "textbox", "target_label": "username"},
+                {"kind": "fill", "target_role": "textbox", "target_label": "password"},
+                {"kind": "click", "target_role": "button", "target_label": "login"},
+            ],
+        }
+        choice = semantic_choice(goal=obs["goal"], obs=obs, primitive_step=primitive, primitive_index=0, macros=[macro], blocked_macro_ids=[], margin=0.0)
+        self.assertEqual(choice["kind"], "macro")
+
+    def test_semantic_choice_guard_blocks_late_macro_fire(self):
+        obs = {"goal": 'Enter the username "alice" and password "pw" and press login.', "axtree_object": {"nodes": [ax_node("20", "button", "Login")]}}
+        primitive = {"kind": "click", "bid": "20", "target_role": "button", "target_label": "login"}
+        macro = {
+            "macro_id": "M1",
+            "suggested_name": "login_user_fill_username_then_fill_password_then_click_login_m001",
+            "suggested_description": "Fill the username and password fields, then click login.",
+            "sequence": ["FILL|role=input|label=<TEXT>|use=B01", "FILL|role=input|label=password|use=B02", "CLICK|role=button|label=login"],
+            "step_templates": [
+                {"kind": "fill", "target_role": "textbox", "target_label": "username"},
+                {"kind": "fill", "target_role": "textbox", "target_label": "password"},
+                {"kind": "click", "target_role": "button", "target_label": "login"},
+            ],
+        }
+        guarded = semantic_choice(goal=obs["goal"], obs=obs, primitive_step=primitive, primitive_index=2, macros=[macro], blocked_macro_ids=[], margin=0.0)
+        unguarded = semantic_choice(
+            goal=obs["goal"],
+            obs=obs,
+            primitive_step=primitive,
+            primitive_index=2,
+            macros=[macro],
+            blocked_macro_ids=[],
+            margin=0.0,
+            use_start_step_guard=False,
+        )
+        self.assertEqual(guarded["kind"], "primitive")
+        self.assertEqual(unguarded["kind"], "macro")
+
+    def test_semantic_choice_guard_uses_label_specificity(self):
+        obs = {"goal": 'Enter the text "hello" and submit.', "axtree_object": {"nodes": [ax_node("14", "textbox", "Text")]}}
+        primitive = {"kind": "fill", "bid": "14", "target_role": "textbox", "target_label": "text"}
+        password_macro = {
+            "macro_id": "M1",
+            "suggested_name": "enter_password_fill_password_then_click_submit_m001",
+            "suggested_description": "Fill the password field, then click submit.",
+            "sequence": ["FILL|role=input|label=password|use=B01", "CLICK|role=button|label=submit"],
+            "step_templates": [
+                {"kind": "fill", "target_role": "textbox", "target_label": "password"},
+                {"kind": "click", "target_role": "button", "target_label": "submit"},
+            ],
+        }
+        choice = semantic_choice(goal=obs["goal"], obs=obs, primitive_step=primitive, primitive_index=0, macros=[password_macro], blocked_macro_ids=[], margin=0.0)
+        self.assertEqual(choice["kind"], "primitive")
 
 
 if __name__ == "__main__":
