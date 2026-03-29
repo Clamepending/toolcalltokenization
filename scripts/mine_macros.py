@@ -18,7 +18,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--input", required=True, help="Path to canonicalized JSONL trace events.")
     parser.add_argument("--output", required=True, help="Path to mined macro JSON.")
     parser.add_argument("--min-support", type=int, default=2, help="Minimum episode support for a macro.")
-    parser.add_argument("--max-chunk-len", type=int, default=4, help="Longest macro length to consider.")
+    parser.add_argument("--max-chunk-len", type=int, default=6, help="Longest macro length to consider.")
     parser.add_argument("--top-k", type=int, default=25, help="Maximum number of macros to keep.")
     return parser.parse_args()
 

@@ -33,7 +33,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--input", required=True, help="Path to raw or converted JSONL trace events.")
     parser.add_argument("--output-dir", required=True, help="Directory for canonical traces and comparison outputs.")
     parser.add_argument("--top-k", type=int, default=25, help="Maximum number of frequent chunks to keep.")
-    parser.add_argument("--max-chunk-len", type=int, default=4, help="Longest frequent chunk length to consider.")
+    parser.add_argument("--max-chunk-len", type=int, default=6, help="Longest frequent chunk length to consider.")
     parser.add_argument("--min-support", type=int, default=2, help="Minimum episode support for a chunk.")
     parser.add_argument("--num-merges", type=int, default=25, help="Number of BPE merges to attempt.")
     parser.add_argument("--min-occurrences", type=int, default=2, help="Minimum pair occurrences for a BPE merge.")

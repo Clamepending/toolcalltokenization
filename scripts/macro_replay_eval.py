@@ -43,7 +43,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--min-group-episodes", type=int, default=5, help="Minimum episode count for a grouped report entry.")
     parser.add_argument("--top-k", type=int, default=25, help="Maximum macros to keep.")
-    parser.add_argument("--max-chunk-len", type=int, default=4, help="Longest chunk length to consider.")
+    parser.add_argument("--max-chunk-len", type=int, default=6, help="Longest chunk length to consider.")
     parser.add_argument("--min-support", type=int, default=2, help="Minimum episode support for a macro.")
     parser.add_argument("--train-ratio", type=float, default=0.8, help="Fraction of episodes to use for macro discovery.")
     parser.add_argument("--seed", type=int, default=0, help="Random seed for the train/test split.")

@@ -126,6 +126,12 @@ python3 scripts/simulate_macro_agent.py \
   --arg arg1=laptop \
   --trace outputs/demo_playwright_trace.zip \
   --headless
+
+MINIWOB_URL="file:///Users/mark/Desktop/projects/toolcalltokenization/data/local/miniwob-plusplus/miniwob/html/miniwob/" \
+  ./.venvbg/bin/python scripts/run_miniwob_live_benchmark.py \
+  --output-prefix outputs/miniwob_live_v3 \
+  --episodes-per-task 20 \
+  --headless
 ```
 
 To sweep action representations instead of using just one canonical form, rerun
@@ -178,6 +184,10 @@ Current best public-data finding:
 - the main remaining bottleneck is coverage: promoted macros only cover about `13.9%` of held-out primitive steps, although within covered groups they save about `14.6%` of decisions
 - the first live browser smoke test now works: the promoted `newegg_search_m003` macro runs on [search_form.html](/Users/mark/Desktop/projects/toolcalltokenization/data/demo/search_form.html) and produces [demo_playwright_trace.zip](/Users/mark/Desktop/projects/toolcalltokenization/outputs/demo_playwright_trace.zip)
 - the same macro also ran successfully on `wikipedia.org` and `duckduckgo.com` after tightening the input locator logic
+- the first public BrowserGym benchmark now works in a separate Python `3.11` env via [run_miniwob_live_benchmark.py](/Users/mark/Desktop/projects/toolcalltokenization/scripts/run_miniwob_live_benchmark.py)
+- on the stable held-out subset of the 20-seed MiniWoB live run, macros reduce decisions from `80` to `32`, a `0.60` decision reduction ratio, while keeping success at `1.0`, in [miniwob_live_v3_stable_benchmark.json](/Users/mark/Desktop/projects/toolcalltokenization/outputs/miniwob_live_v3_stable_benchmark.json)
+- the learned MiniWoB live registry contains `17` promoted macros, `15` of them parameterized, in [miniwob_live_v3_macro_registry.json](/Users/mark/Desktop/projects/toolcalltokenization/outputs/miniwob_live_v3_macro_registry.json)
+- the current caveat is that MiniWoB uses perfect macro selection over held-out primitive traces, so it is an upper-bound live benchmark on macro utility rather than a full on-policy macro-calling agent
 
 ## Why this starts offline
 

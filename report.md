@@ -957,7 +957,8 @@ The current runtime plan is:
 So the current reasoning is:
 
 - **Playwright** is the right first live harness
-- **BrowserGym / AgentLab / WorkArena-L1** is the right first benchmark harness
+- **BrowserGym-MiniWoB** is the first public benchmark harness we can run end to end today
+- **BrowserGym / AgentLab / WorkArena-L1** is still the right next benchmark harness once the environment blockers are cleared
 
 This split keeps the implementation simple while still preserving a path to rigorous evaluation.
 
@@ -1013,6 +1014,161 @@ What is still missing before the first serious online experiment:
 - richer page-state preconditions
 - automatic primitive fallback and recovery inside a live browser episode
 - BrowserGym / AgentLab benchmark integration
+
+### MiniWoB live benchmark
+
+We now have the first real **BrowserGym benchmark** running in a separate Python `3.11` environment:
+
+- `.venvbg` created via `uv`
+- `browsergym-miniwob`
+- local `miniwob-plusplus` clone pinned to the BrowserGym README commit
+- Playwright Chromium installed for the benchmark env
+
+This matters because it gives us a public, reproducible browser benchmark without waiting for Globus, raw Mind2Web traces, or private ServiceNow instances.
+
+The current MiniWoB study is intentionally narrow:
+
+- same-page workflow tasks only
+- primitive policy is scripted, not LLM-driven
+- macros are mined offline from live primitive traces
+- held-out evaluation measures live browser execution plus decision-side savings
+
+So this is best interpreted as a **live upper bound on macro utility** once a controller can call the right macro at the right time.
+
+#### Benchmark design
+
+We selected stable same-page task families that naturally look like short browser routines:
+
+- `choose_list`
+- `enter_text`
+- `enter_text_dynamic`
+- `enter_password`
+- `login_user`
+- `form_sequence_2`
+- `form_sequence_3`
+- `use_autocomplete`
+
+We also explored `click_button_sequence`, but it turned out to be flaky in BrowserGym because one button can intercept pointer events meant for the other. We now treat that task as excluded from the stable benchmark set.
+
+For each task family:
+
+- run a primitive scripted solver over multiple seeds
+- record real BrowserGym traces and per-step browser timings
+- convert those live episodes into our JSONL trace format
+- mine per-task macros with `dataflow_coarse`
+- keep macros up to length `6`
+- evaluate held-out episodes by compressing the exact live primitive traces with the mined macros
+
+This gives us:
+
+- real browser execution time
+- real task success
+- real primitive traces
+- macro decision savings on held-out episodes
+
+#### Current live result
+
+The strongest stable result comes from the larger MiniWoB sweep artifacts:
+
+- full live collection: `outputs/miniwob_live_v3_trace_summary.json`
+- macro registry: `outputs/miniwob_live_v3_macro_registry.json`
+- stable benchmark subset: `outputs/miniwob_live_v3_stable_benchmark.json`
+
+Stable held-out subset result, excluding the flaky `click_button_sequence` task:
+
+- held-out episodes: `32`
+- held-out success rate: `1.0`
+- primitive decisions: `80`
+- macro decisions: `32`
+- decisions saved: `48`
+- decision reduction ratio: `0.60`
+- measured browser time: about `61.5s`
+- estimated total time at `1000 ms` per agent decision:
+  - primitive: about `141.5s`
+  - macro-aware: about `93.5s`
+  - estimated time saved: about `48.0s`
+
+The smaller clean sweep shows the same pattern:
+
+- `outputs/miniwob_live_v2_benchmark.json`
+- held-out episodes: `18`
+- held-out success rate: `1.0`
+- decision reduction ratio: `0.5909`
+
+The learned MiniWoB macro library is also quite clean:
+
+- promoted macros: `17`
+- parameterized promoted macros: `15`
+- macro lengths:
+  - `13` macros of length `2`
+  - `4` macros of length `3`
+
+Representative examples:
+
+- `choose_list`: `SELECT -> CLICK submit`
+- `enter_text`: `FILL(value) -> CLICK submit`
+- `login_user`: `FILL(username) -> FILL(password) -> CLICK login`
+- `use_autocomplete`: `FILL(prefix) -> CLICK suggestion -> CLICK submit`
+
+#### Interpretation
+
+This is the strongest result in the repo so far.
+
+It tells us:
+
+- long-lived, repeated browser workflows really can become useful macros
+- the low `~2%` Mind2Web macro-agent result was mostly a coverage problem, not a proof that macros are unhelpful
+- when coverage is dense and task families are tight, live decision savings can be large
+- `2`-step and `3`-step workflow macros are already enough to remove around `60%` of decisions on held-out browser episodes
+
+It also sharpens the research picture:
+
+- the main question is not “can macros help at all?”
+- the main question is “how do we get this kind of dense local coverage on broader benchmarks like Mind2Web, WorkArena, and live sites?”
+
+#### Important caveat
+
+This MiniWoB benchmark is **not yet an on-policy macro-selection benchmark**.
+
+Right now:
+
+- the primitive solver is scripted
+- the macro-aware condition compresses the scripted primitive trace on held-out episodes
+- browser actions executed are still the same primitive actions under the hood
+- the time savings come from fewer agent decisions, not faster DOM interaction
+
+So this result should be read as:
+
+- a strong live-browser estimate of the upside of macros
+- not yet a complete measurement of macro-triggering intelligence
+
+That is still useful, because it cleanly separates two questions:
+
+1. If a controller can call the right macro, is there meaningful live-browser upside?
+2. How much of that upside survives when macro choice is learned online?
+
+For MiniWoB, question `1` now looks clearly positive.
+
+#### BrowserGym / WorkArena blockers
+
+We also pushed on the original BrowserGym + AgentLab + WorkArena path.
+
+What worked:
+
+- `uv` successfully installed a local Python `3.11`
+- BrowserGym MiniWoB ran in `.venvbg`
+
+What is still blocked for WorkArena on this machine:
+
+- system Python is `3.9`, while BrowserGym uses Python features that require `3.10+`
+- `agentlab` did not install in the `3.9` env because of downstream dependency availability
+- `browsergym-workarena` requires `playwright==1.44.0`
+- WorkArena also needs gated ServiceNow instance access through Hugging Face
+
+So the practical benchmark sequence is now:
+
+1. MiniWoB first, because it is public and runnable now
+2. WorkArena next, once we isolate the required Python / Playwright stack and have instance access
 
 ### Savings and replay metrics
 

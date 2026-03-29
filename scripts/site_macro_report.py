@@ -42,7 +42,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--min-episodes", type=int, default=5, help="Minimum episode count for a group to be reported.")
     parser.add_argument("--top-groups", type=int, default=20, help="Maximum number of groups to keep in the report.")
     parser.add_argument("--top-k", type=int, default=20, help="Maximum macros to keep per group.")
-    parser.add_argument("--max-chunk-len", type=int, default=4, help="Longest chunk length to mine.")
+    parser.add_argument("--max-chunk-len", type=int, default=6, help="Longest chunk length to mine.")
     parser.add_argument("--min-support", type=int, default=2, help="Minimum episode support for a macro.")
     return parser.parse_args()
 
