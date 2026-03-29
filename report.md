@@ -1430,30 +1430,118 @@ These are the current project decisions based on the evidence above.
 8. For the next benchmark jump, prioritize **state-aware preconditions** over more mining sophistication.
    The main remaining loss is now selection ambiguity, not inability to discover chunks.
 
-#### BrowserGym / WorkArena blockers
+#### BrowserGym / WorkArena status
 
-We also pushed on the original BrowserGym + AgentLab + WorkArena path.
+The WorkArena path is now actually unblocked on this machine.
 
-What now works:
+What works now:
 
-- `uv` successfully installed a local Python `3.11`
-- BrowserGym MiniWoB runs in `.venvbg`
-- `browsergym-workarena` now installs in `.venvbg`
-- `agentlab` now installs in `.venvbg`
-- WorkArena environments are registered locally through Gymnasium
+- `browsergym-workarena` installs and imports in `.venvbg`
+- `agentlab` installs and imports in `.venvbg`
+- gated Hugging Face access to `ServiceNow/WorkArena-Instances` now succeeds
+- a real WorkArena environment reset works locally
+- the task object and live Playwright page are reachable through `env.unwrapped`
+- WorkArena task `cheat(...)` policies can be executed and validated in the live browser
 
-What is still blocked for WorkArena on this machine:
+That moved WorkArena from “pending external approval” to “usable real-benchmark trace source.”
 
-- WorkArena reset fails without gated ServiceNow instance access through Hugging Face
-- the concrete failure is:
-  `RuntimeError: Could not access ServiceNow/WorkArena-Instances/instances_v2.json`
-- the package stack is no longer the main blocker
-- the remaining blocker is external authentication / permission to the gated WorkArena instance manifest
+### First WorkArena Result: Real ServiceNow Service-Catalog Traces
 
-So the practical benchmark sequence is now:
+To make the first WorkArena result as simple and high-signal as possible, we started with one dense repeated family:
 
-1. MiniWoB first, because it is public and runnable now
-2. WorkArena next, once we have Hugging Face access to `ServiceNow/WorkArena-Instances` and a valid `HUGGING_FACE_HUB_TOKEN`
+- ServiceNow service-catalog ordering tasks
+- `9` different order-item task types
+- `2` seeds each
+- `18` real browser episodes total
+
+New code:
+
+- `toolcalltokenization/workarena_benchmark.py`
+- `scripts/run_workarena_cheat_benchmark.py`
+
+What this harness does:
+
+- resets a real WorkArena BrowserGym environment
+- runs the official WorkArena `cheat(...)` policy on the live Playwright page
+- instruments the underlying Playwright `click`, `fill`, and `select_option` calls into our trace schema
+- mines macros over those real browser traces
+- evaluates held-out replay compression using the same registry pipeline as MiniWoB
+
+This is not yet an on-policy macro agent, but it is already a real benchmark-site trace source and a real held-out macro evaluation.
+
+The collected dataset is:
+
+- output traces: `outputs/workarena_service_catalog_v1_traces.jsonl`
+- summary: `outputs/workarena_service_catalog_v1_trace_summary.json`
+
+Dataset stats:
+
+- `18` episodes
+- `121` primitive browser actions
+- `1.0` success
+- `134042.987 ms` total browser time across the collected cheat runs
+
+The first held-out replay result is strong:
+
+- grouping: `task_family = service catalog`
+- split seed `0`
+- `28 -> 10` held-out decisions
+- `64.29%` decision reduction
+- `18s` estimated decision-latency savings
+- `1.0` success on the held-out episodes
+
+Output:
+
+- benchmark: `outputs/workarena_service_catalog_v1_benchmark.json`
+- registry: `outputs/workarena_service_catalog_v1_macro_registry.json`
+
+The qualitative result is even more important:
+
+- longer macros finally show up on a real benchmark site
+- the promoted registry contains macros of lengths `2, 3, 4, 5, 6, 7`
+- this is exactly the “same site, same workflow skeleton, few changing arguments” setting we expected would produce larger reusable chunks
+
+Representative discovered macros:
+
+- common front-half:
+  `CLICK link -> CLICK item -> SELECT quantity`
+- common finish:
+  `CLICK choice -> CLICK choice -> CLICK button`
+- longer parameterized macro:
+  `CLICK link -> CLICK item -> SELECT quantity -> CLICK input -> CLICK input -> FILL input -> CLICK choice`
+
+That last one comes from the laptop-ordering flows where the site asks for additional software requirements.
+
+To check whether the `64.29%` result was just one lucky split, we swept the train/eval split seed from `0` to `4`:
+
+- output: `outputs/workarena_service_catalog_v1_split_sweep.json`
+- mean decision reduction: `56.6%`
+- min: `50.0%`
+- max: `64.29%`
+
+![WorkArena service-catalog split sweep](docs/figures/workarena_service_catalog_split_sweep.svg)
+
+This is an important result for the project:
+
+- WorkArena does contain the kind of real repeated browser workflows we wanted
+- real benchmark-site traces can surface longer macros than Mind2Web did
+- the limiting factor on broader data still looks like coverage and heterogeneity, not the basic existence of reusable workflow chunks
+
+There is also a useful negative control:
+
+- output: `outputs/workarena_service_catalog_v1_grouping_compare.json`
+- grouping by `task_family` works well
+- grouping by `task_name` with only `2` seeds per specific item task produces **zero** promoted macros
+
+So the WorkArena win is not just memorizing one exact task template. It comes from pooling repeated structure across a shared workflow family:
+
+- `order_ipad_pro`
+- `order_ipad_mini`
+- `order_standard_laptop`
+- `order_sales_laptop`
+- and the other catalog-order tasks
+
+That is exactly the kind of cross-instance redundancy we want for higher-level browser tools.
 
 ### Savings and replay metrics
 

@@ -545,6 +545,71 @@
       "primitive_total_time_ms": 141547.183,
       "steps_saved": 48,
       "success_rate": 1.0
+    },
+    "workarena_service_catalog": {
+      "browser_time_ms": 30382.723,
+      "decision_reduction_ratio": 0.6429,
+      "episodes": 4,
+      "estimated_time_saved_ms": 18000.0,
+      "macro_hits": {
+        "M001": 1,
+        "M004": 2,
+        "M005": 1,
+        "M017": 2
+      },
+      "macro_steps": 10,
+      "macro_total_time_ms": 40382.723,
+      "primitive_steps": 28,
+      "primitive_total_time_ms": 58382.723,
+      "steps_saved": 18,
+      "success_rate": 1.0
+    },
+    "workarena_service_catalog_sweep": {
+      "max_decision_reduction_ratio": 0.6429,
+      "mean_decision_reduction_ratio": 0.566,
+      "min_decision_reduction_ratio": 0.5,
+      "runs": [
+        {
+          "decision_reduction_ratio": 0.6429,
+          "macro_steps": 10,
+          "primitive_steps": 28,
+          "registry_count": 13,
+          "split_seed": 0,
+          "steps_saved": 18
+        },
+        {
+          "decision_reduction_ratio": 0.5417,
+          "macro_steps": 11,
+          "primitive_steps": 24,
+          "registry_count": 11,
+          "split_seed": 1,
+          "steps_saved": 13
+        },
+        {
+          "decision_reduction_ratio": 0.6,
+          "macro_steps": 10,
+          "primitive_steps": 25,
+          "registry_count": 10,
+          "split_seed": 2,
+          "steps_saved": 15
+        },
+        {
+          "decision_reduction_ratio": 0.5455,
+          "macro_steps": 10,
+          "primitive_steps": 22,
+          "registry_count": 6,
+          "split_seed": 3,
+          "steps_saved": 12
+        },
+        {
+          "decision_reduction_ratio": 0.5,
+          "macro_steps": 10,
+          "primitive_steps": 20,
+          "registry_count": 6,
+          "split_seed": 4,
+          "steps_saved": 10
+        }
+      ]
     }
   },
   "semantic_policy_sweep": [
@@ -721,6 +786,48 @@
       "steps_saved": 48,
       "success_rate": 1.0,
       "successful_macro_calls": 32
+    }
+  ],
+  "workarena_service_catalog_sweep": [
+    {
+      "decision_reduction_ratio": 0.6429,
+      "macro_steps": 10,
+      "primitive_steps": 28,
+      "registry_count": 13,
+      "split_seed": 0,
+      "steps_saved": 18
+    },
+    {
+      "decision_reduction_ratio": 0.5417,
+      "macro_steps": 11,
+      "primitive_steps": 24,
+      "registry_count": 11,
+      "split_seed": 1,
+      "steps_saved": 13
+    },
+    {
+      "decision_reduction_ratio": 0.6,
+      "macro_steps": 10,
+      "primitive_steps": 25,
+      "registry_count": 10,
+      "split_seed": 2,
+      "steps_saved": 15
+    },
+    {
+      "decision_reduction_ratio": 0.5455,
+      "macro_steps": 10,
+      "primitive_steps": 22,
+      "registry_count": 6,
+      "split_seed": 3,
+      "steps_saved": 12
+    },
+    {
+      "decision_reduction_ratio": 0.5,
+      "macro_steps": 10,
+      "primitive_steps": 20,
+      "registry_count": 6,
+      "split_seed": 4,
+      "steps_saved": 10
     }
   ]
 }

@@ -34,6 +34,8 @@ def build_summary() -> dict:
     mind2web = load_json(ROOT / "outputs" / "mind2web_site_task_family_macro_agent_sim.json")
     mind2web_hierarchy = load_json(ROOT / "outputs" / "mind2web_registry_hierarchy_eval.json")
     miniwob_replay = load_json(ROOT / "outputs" / "miniwob_live_v3_stable_benchmark.json")
+    workarena_service_catalog = load_json(ROOT / "outputs" / "workarena_service_catalog_v1_benchmark.json")
+    workarena_service_catalog_sweep = load_json(ROOT / "outputs" / "workarena_service_catalog_v1_split_sweep.json")
     miniwob_local_oracle = load_json(ROOT / "outputs" / "miniwob_live_v3_policy_oracle_v2_macro_policy_benchmark.json")
     miniwob_global_exact = load_json(ROOT / "outputs" / "miniwob_live_v3_global_oracle_macro_policy_benchmark.json")
     miniwob_global_trigger2 = load_json(ROOT / "outputs" / "miniwob_live_v3_global_trigger_macro_policy_benchmark.json")
@@ -88,6 +90,8 @@ def build_summary() -> dict:
             "mind2web_best_hierarchy": next(
                 item["summary"] for item in mind2web_hierarchy["variants"] if item["name"] == "exact_then_site_r07"
             ),
+            "workarena_service_catalog": workarena_service_catalog["summary"],
+            "workarena_service_catalog_sweep": workarena_service_catalog_sweep,
             "miniwob_stable_replay_upper_bound": miniwob_replay["summary"],
             "miniwob_local_oracle": miniwob_local_oracle["summary"],
             "miniwob_global_exact": miniwob_global_exact["summary"],
@@ -102,6 +106,7 @@ def build_summary() -> dict:
             "miniwob_learned_global_noguard": miniwob_learned_global_noguard["summary"],
         },
         "mind2web_hierarchy_sweep": mind2web_hierarchy["variants"],
+        "workarena_service_catalog_sweep": workarena_service_catalog_sweep["runs"],
         "global_trigger_sweep": [
             {"label": "Global exact", **miniwob_global_exact["summary"]},
             {"label": "Global 2-step", **miniwob_global_trigger2["summary"]},
@@ -146,6 +151,7 @@ def plot_overall(summary: dict) -> Path:
     scenarios = [
         ("Mind2Web\nsite+task\noffline", summary["overall"]["mind2web_site_task_family"]["decision_reduction_ratio"], "#c46b32"),
         ("Mind2Web\nhierarchy\nbest", summary["overall"]["mind2web_best_hierarchy"]["decision_reduction_ratio"], "#bc4749"),
+        ("WorkArena\nservice catalog\nreal-browser", summary["overall"]["workarena_service_catalog_sweep"]["mean_decision_reduction_ratio"], "#8a5cf6"),
         ("MiniWoB\nreplay\nupper bound", summary["overall"]["miniwob_stable_replay_upper_bound"]["decision_reduction_ratio"], "#1f77b4"),
         ("MiniWoB\nlocal live\n2-step", summary["overall"]["miniwob_local_oracle"]["decision_reduction_ratio"], "#2a9d8f"),
         ("MiniWoB\nglobal live\n2-step", summary["overall"]["miniwob_global_trigger2"]["decision_reduction_ratio"], "#457b9d"),
@@ -182,8 +188,17 @@ def plot_overall(summary: dict) -> Path:
         color="#7f1d1d",
     )
     ax.text(
-        4,
-        values[4] + 4.5,
+        2,
+        values[2] + 4.5,
+        "18 real ServiceNow\nepisodes, mean over\n5 split seeds",
+        ha="center",
+        va="bottom",
+        fontsize=9,
+        color="#5b3c99",
+    )
+    ax.text(
+        5,
+        values[5] + 4.5,
         "Shared action space",
         ha="center",
         va="bottom",
@@ -191,8 +206,8 @@ def plot_overall(summary: dict) -> Path:
         color="#1d3557",
     )
     ax.text(
-        5,
-        values[5] + 4.5,
+        6,
+        values[6] + 4.5,
         "Loose trigger adds\nfalse macro calls",
         ha="center",
         va="bottom",
@@ -244,6 +259,38 @@ def plot_mind2web_hierarchy(summary: dict) -> Path:
     axes[1].tick_params(axis="x", rotation=18)
     fig.tight_layout()
     output = DOCS_FIGURES / "mind2web_hierarchy_sweep.svg"
+    fig.savefig(output, bbox_inches="tight")
+    plt.close(fig)
+    return output
+
+
+def plot_workarena_service_catalog(summary: dict) -> Path:
+    runs = summary["workarena_service_catalog_sweep"]
+    labels = [f"Seed {item['split_seed']}" for item in runs]
+    reductions = [percent(item["decision_reduction_ratio"]) for item in runs]
+    registry_counts = [int(item["registry_count"]) for item in runs]
+    mean_reduction = percent(summary["overall"]["workarena_service_catalog_sweep"]["mean_decision_reduction_ratio"])
+
+    fig, axes = plt.subplots(2, 1, figsize=(9.8, 6.8), sharex=True, gridspec_kw={"height_ratios": [2, 1.4]})
+    bars = axes[0].bar(labels, reductions, color="#8a5cf6")
+    axes[0].axhline(mean_reduction, color="#3c096c", linestyle="--", linewidth=1.8)
+    axes[0].set_ylabel("Decision Reduction (%)")
+    axes[0].set_title("WorkArena Service-Catalog Cheat Traces Produce Long, Reusable Real-Browser Macros")
+    axes[0].grid(axis="y", alpha=0.25)
+    axes[0].set_ylim(0, max(reductions) * 1.25 if reductions else 1)
+    for bar, value in zip(bars, reductions):
+        axes[0].text(bar.get_x() + bar.get_width() / 2, value + 0.7, f"{value:.1f}%", ha="center", va="bottom")
+    axes[0].text(len(labels) - 0.35, mean_reduction + 1.0, f"mean {mean_reduction:.1f}%", color="#3c096c", ha="right")
+
+    axes[1].bar(labels, registry_counts, color="#c77dff", alpha=0.9)
+    axes[1].set_ylabel("Promoted Macros")
+    axes[1].set_xlabel("Train/Eval Split Seed")
+    axes[1].grid(axis="y", alpha=0.25)
+    for idx, value in enumerate(registry_counts):
+        axes[1].text(idx, value + 0.2, str(value), ha="center", va="bottom")
+
+    fig.tight_layout()
+    output = DOCS_FIGURES / "workarena_service_catalog_split_sweep.svg"
     fig.savefig(output, bbox_inches="tight")
     plt.close(fig)
     return output
@@ -374,6 +421,7 @@ def main() -> None:
     outputs = {
         "overview": str(plot_overall(summary)),
         "mind2web_hierarchy": str(plot_mind2web_hierarchy(summary)),
+        "workarena_service_catalog": str(plot_workarena_service_catalog(summary)),
         "global_sweep": str(plot_global_sweep(summary)),
         "failure_attribution": str(plot_failure_attribution(summary)),
         "semantic_policy_sweep": str(plot_semantic_policy_sweep(summary)),
