@@ -1,7 +1,10 @@
 import unittest
 
 from toolcalltokenization.selector_benchmark import (
+    choose_oracle_macro,
     evaluate_selector_replay,
+    goal_has_configuration_hint,
+    macro_expected_gain,
     macro_start_compatible,
     primitive_action_description,
     primitive_action_name,
@@ -9,6 +12,29 @@ from toolcalltokenization.selector_benchmark import (
 
 
 class SelectorBenchmarkTests(unittest.TestCase):
+    def test_macro_expected_gain_prefers_longer_reusable_macro(self):
+        short_macro = {"sequence": ["A", "B"], "replay_precision": 1.0}
+        long_macro = {"sequence": ["A", "B", "C", "D"], "replay_precision": 0.75}
+        self.assertGreater(macro_expected_gain(long_macro), macro_expected_gain(short_macro))
+
+    def test_choose_oracle_macro_prefers_higher_expected_gain(self):
+        short_macro = {
+            "macro_id": "M001",
+            "suggested_name": "short",
+            "sequence": ["A", "B"],
+            "replay_precision": 1.0,
+            "support": 10,
+        }
+        long_macro = {
+            "macro_id": "M002",
+            "suggested_name": "long",
+            "sequence": ["A", "B", "C", "D"],
+            "replay_precision": 0.75,
+            "support": 4,
+        }
+        chosen = choose_oracle_macro(["A", "B", "C", "D"], [short_macro, long_macro], ())
+        self.assertEqual(chosen["macro_id"], "M002")
+
     def test_primitive_action_metadata_is_readable(self):
         row = {
             "action_type": "fill",
@@ -17,6 +43,12 @@ class SelectorBenchmarkTests(unittest.TestCase):
         }
         self.assertIn("password", primitive_action_name(row))
         self.assertIn("password", primitive_action_description(row))
+
+    def test_goal_has_configuration_hint_detects_structured_task(self):
+        row = {
+            "task": 'Order a laptop with configuration {"Additional software requirements": "Slack"}',
+        }
+        self.assertTrue(goal_has_configuration_hint(row))
 
     def test_macro_start_compatible_checks_kind_role_and_label(self):
         row = {

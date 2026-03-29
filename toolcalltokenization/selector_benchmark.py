@@ -98,6 +98,12 @@ def macro_runtime_id(macro: dict) -> str:
     return f"{group_key}::{macro_id}"
 
 
+def macro_expected_gain(macro: dict) -> float:
+    length = max(len(macro.get("sequence", [])) - 1, 0)
+    replay_precision = float(macro.get("replay_precision", 0.0))
+    return replay_precision * length
+
+
 def primitive_action_name(row: dict) -> str:
     action = normalize_text(row.get("action_name") or row.get("action_type") or "action") or "action"
     label = normalize_text(row.get("target_label"))
@@ -131,6 +137,15 @@ def row_context_text(row: dict, previous_actions: Sequence[str]) -> str:
         " ".join(previous_actions[-2:]),
     ]
     return " ".join(part for part in parts if part)
+
+
+def goal_text(row: dict) -> str:
+    return normalize_text(row.get("task") or row.get("confirmed_task") or "")
+
+
+def goal_has_configuration_hint(row: dict) -> bool:
+    goal = goal_text(row)
+    return any(hint in goal for hint in ("configuration", "requirement", "requirements", "{", "}:")) or ":" in goal
 
 
 def step_phrase(template: dict) -> str:
@@ -228,6 +243,10 @@ def candidate_set(
                 "description": str(macro.get("suggested_description", "")),
                 "length": len(macro.get("sequence", [])),
                 "tokens": text_tokens(macro_text(macro)),
+                "support": int(macro.get("support", 0)),
+                "exact_replays": int(macro.get("exact_replays", 0)),
+                "replay_precision": float(macro.get("replay_precision", 0.0)),
+                "expected_gain": macro_expected_gain(macro),
                 "macro": macro,
             }
         )
@@ -257,20 +276,46 @@ def candidate_features(
     row_kind = normalize_text(row.get("action_name") or row.get("action_type")) or "action"
     row_role = normalize_role(row.get("target_role")) or "element"
     row_label = normalize_text(row.get("target_label")) or row_role
+    config_hint = goal_has_configuration_hint(row)
     features[f"row_kind:{row_kind}"] = 1.0
     features[f"row_role:{row_role}"] = 1.0
     features[f"row_label:{row_label}"] = 1.0
+    if config_hint:
+        features["goal_has_configuration_hint"] = 1.0
 
     if candidate["kind"] == "primitive":
         features["primitive_bias"] = 1.0
+        if config_hint:
+            features["config_hint:primitive"] = 1.0
         return features
 
     macro = dict(candidate["macro"])
     features["macro_bias"] = 1.0
     features["macro_length"] = float(candidate["length"])
+    features["macro_expected_gain"] = float(candidate.get("expected_gain", 0.0))
+    features["macro_replay_precision"] = float(candidate.get("replay_precision", 0.0))
+    features["macro_exact_replays"] = float(candidate.get("exact_replays", 0))
+    features["macro_support"] = float(candidate.get("support", 0))
     features[f"macro_name:{candidate['name']}"] = 1.0
-    features["macro_replay_precision"] = float(macro.get("replay_precision", 0.0))
     start = list(macro.get("step_templates", []))
+    kinds = [normalize_text(step.get("kind")) or "action" for step in start]
+    roles = [normalize_role(step.get("target_role")) or "element" for step in start]
+    fill_count = sum(1 for kind in kinds if kind in {"fill", "type", "paste"})
+    choice_count = sum(1 for role in roles if role == "choice")
+    input_count = sum(1 for role in roles if role == "input")
+    if fill_count:
+        features["macro_has_fill"] = 1.0
+    if choice_count:
+        features[f"macro_choice_count:{choice_count}"] = 1.0
+    if input_count:
+        features[f"macro_input_count:{input_count}"] = 1.0
+    if config_hint:
+        if fill_count:
+            features["config_hint:macro_has_fill"] = 1.0
+        if choice_count:
+            features["config_hint:macro_has_choice"] = 1.0
+        if len(kinds) >= 6:
+            features["config_hint:macro_long"] = 1.0
     if not start:
         return features
     first = start[0]
@@ -282,6 +327,13 @@ def candidate_features(
         features[f"start_role_match:{step_role}"] = 1.0
     for token in sorted(label_tokens(row.get("target_label")) & label_tokens(first.get("target_label"))):
         features[f"start_label_match:{token}"] = 1.0
+    features[f"start_template:{step_kind}|{step_role or 'element'}"] = 1.0
+    if len(start) > 1:
+        second = start[1]
+        second_kind = normalize_text(second.get("kind")) or "action"
+        second_role = normalize_role(second.get("target_role")) or "element"
+        features[f"second_template:{second_kind}|{second_role}"] = 1.0
+        features[f"transition:{step_kind}|{step_role or 'element'}->{second_kind}|{second_role}"] = 1.0
     return features
 
 
@@ -324,8 +376,10 @@ def finalize_averaged_weights(
 
 def macro_sort_key(macro: dict) -> Tuple:
     return (
+        -macro_expected_gain(macro),
         -float(macro.get("replay_precision", 0.0)),
         -len(macro.get("sequence", [])),
+        -int(macro.get("exact_replays", 0)),
         -int(macro.get("support", 0)),
         str(macro_runtime_id(macro)),
     )
@@ -575,6 +629,9 @@ def semantic_choice(
             is_macro=candidate["kind"] == "macro",
             length=int(candidate["length"]),
         )
+        if candidate["kind"] == "macro":
+            score += 1.25 * float(candidate.get("expected_gain", 0.0))
+            score += 0.15 * min(float(candidate.get("support", 0)), 10.0)
         scored.append((score, candidate))
     scored.sort(key=lambda item: (item[0], item[1]["kind"] == "macro", item[1]["id"]), reverse=True)
     primitive_score = next(score for score, candidate in scored if candidate["kind"] == "primitive")

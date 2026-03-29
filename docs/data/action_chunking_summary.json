@@ -266,6 +266,67 @@
       "steps_saved": 43,
       "successful_macro_calls": 32
     },
+    "mind2web_selector_learned": {
+      "action_scope": "task",
+      "agent_decisions": 3598,
+      "attempted_macro_calls": 8,
+      "coverage_ratio": 0.0574,
+      "covered_primitive_steps": 207,
+      "decision_reduction_ratio": 0.0017,
+      "episodes": 427,
+      "failed_macro_calls": 1,
+      "macro_hits": {
+        "gamestop_search_m012": 1,
+        "kayak_lodging_search_m004": 1,
+        "newegg_search_m003": 2,
+        "spothero_reservation_flow_m001": 1,
+        "tvguide_search_m006": 1,
+        "yelp_search_m012": 1
+      },
+      "macro_success_rate": 0.875,
+      "model": {
+        "epochs": 12,
+        "model_type": "averaged_perceptron",
+        "nonzero_weights": 382,
+        "training_examples": 8555,
+        "updates": 739
+      },
+      "policy_mode": "learned",
+      "primitive_steps": 3604,
+      "steps_saved": 6,
+      "successful_macro_calls": 7
+    },
+    "mind2web_selector_oracle": {
+      "action_scope": "task",
+      "agent_decisions": 3575,
+      "attempted_macro_calls": 17,
+      "coverage_ratio": 0.0574,
+      "covered_primitive_steps": 207,
+      "decision_reduction_ratio": 0.008,
+      "episodes": 427,
+      "failed_macro_calls": 0,
+      "macro_hits": {
+        "espn_search_m003": 1,
+        "gamestop_search_m012": 1,
+        "ign_search_m001": 1,
+        "kayak_lodging_search_m004": 1,
+        "mbta_workflow_m014": 1,
+        "newegg_search_m003": 2,
+        "parking_search_m001": 1,
+        "spothero_reservation_flow_m001": 1,
+        "ticketcenter_search_m004": 2,
+        "tvguide_search_m006": 1,
+        "united_flight_search_m012": 1,
+        "viator_search_m007": 1,
+        "yelp_search_m012": 1,
+        "yelp_search_m016": 2
+      },
+      "macro_success_rate": 1.0,
+      "policy_mode": "oracle",
+      "primitive_steps": 3604,
+      "steps_saved": 29,
+      "successful_macro_calls": 17
+    },
     "mind2web_site_task_family": {
       "coverage_ratio": 0.1388,
       "decision_reduction_ratio": 0.0218,
@@ -548,33 +609,6 @@
     },
     "workarena_selector_learned": {
       "action_scope": "task",
-      "agent_decisions": 17,
-      "attempted_macro_calls": 11,
-      "coverage_ratio": 0.8571,
-      "covered_primitive_steps": 24,
-      "decision_reduction_ratio": 0.3929,
-      "episodes": 4,
-      "failed_macro_calls": 3,
-      "macro_hits": {
-        "generic_click_choice_then_click_choice_then_click_button_m005": 3,
-        "generic_click_input_then_click_input_m007": 2,
-        "generic_click_link_then_click_text_then_choose_requested_value_from_list_m001": 3
-      },
-      "macro_success_rate": 0.7273,
-      "model": {
-        "epochs": 8,
-        "model_type": "averaged_perceptron",
-        "nonzero_weights": 167,
-        "training_examples": 93,
-        "updates": 224
-      },
-      "policy_mode": "learned",
-      "primitive_steps": 28,
-      "steps_saved": 11,
-      "successful_macro_calls": 8
-    },
-    "workarena_selector_oracle": {
-      "action_scope": "task",
       "agent_decisions": 14,
       "attempted_macro_calls": 8,
       "coverage_ratio": 0.8571,
@@ -588,10 +622,38 @@
         "generic_click_link_then_click_text_then_choose_requested_value_from_list_m001": 3
       },
       "macro_success_rate": 1.0,
-      "policy_mode": "oracle",
+      "model": {
+        "epochs": 20,
+        "model_type": "averaged_perceptron",
+        "nonzero_weights": 208,
+        "training_examples": 93,
+        "updates": 799
+      },
+      "policy_mode": "learned",
       "primitive_steps": 28,
       "steps_saved": 14,
       "successful_macro_calls": 8
+    },
+    "workarena_selector_oracle": {
+      "action_scope": "task",
+      "agent_decisions": 10,
+      "attempted_macro_calls": 6,
+      "coverage_ratio": 0.8571,
+      "covered_primitive_steps": 24,
+      "decision_reduction_ratio": 0.6429,
+      "episodes": 4,
+      "failed_macro_calls": 0,
+      "macro_hits": {
+        "generic_click_choice_then_click_button_m004": 2,
+        "generic_click_choice_then_click_choice_then_click_button_m005": 1,
+        "generic_click_link_then_click_text_then_choose_requested_value_from_list_m001": 1,
+        "generic_click_link_then_click_text_then_choose_requested_value_from_list_m010": 2
+      },
+      "macro_success_rate": 1.0,
+      "policy_mode": "oracle",
+      "primitive_steps": 28,
+      "steps_saved": 18,
+      "successful_macro_calls": 6
     },
     "workarena_selector_semantic_guard": {
       "action_scope": "task",
@@ -615,22 +677,23 @@
     },
     "workarena_selector_semantic_noguard": {
       "action_scope": "task",
-      "agent_decisions": 40,
-      "attempted_macro_calls": 35,
+      "agent_decisions": 31,
+      "attempted_macro_calls": 27,
       "coverage_ratio": 0.8571,
       "covered_primitive_steps": 24,
-      "decision_reduction_ratio": -0.4286,
+      "decision_reduction_ratio": -0.1071,
       "episodes": 4,
-      "failed_macro_calls": 29,
+      "failed_macro_calls": 21,
       "macro_hits": {
-        "generic_click_choice_then_click_button_m004": 3,
+        "generic_click_choice_then_click_button_m004": 2,
+        "generic_click_choice_then_click_choice_then_click_button_m005": 1,
         "generic_click_link_then_click_text_then_choose_requested_value_from_list_m001": 1,
         "generic_click_link_then_click_text_then_choose_requested_value_from_list_m010": 2
       },
-      "macro_success_rate": 0.1714,
+      "macro_success_rate": 0.2222,
       "policy_mode": "semantic",
       "primitive_steps": 28,
-      "steps_saved": -12,
+      "steps_saved": -3,
       "successful_macro_calls": 6
     },
     "workarena_service_catalog": {
@@ -897,6 +960,28 @@
     },
     {
       "action_scope": "task",
+      "agent_decisions": 10,
+      "attempted_macro_calls": 6,
+      "coverage_ratio": 0.8571,
+      "covered_primitive_steps": 24,
+      "decision_reduction_ratio": 0.6429,
+      "episodes": 4,
+      "failed_macro_calls": 0,
+      "label": "Oracle selector",
+      "macro_hits": {
+        "generic_click_choice_then_click_button_m004": 2,
+        "generic_click_choice_then_click_choice_then_click_button_m005": 1,
+        "generic_click_link_then_click_text_then_choose_requested_value_from_list_m001": 1,
+        "generic_click_link_then_click_text_then_choose_requested_value_from_list_m010": 2
+      },
+      "macro_success_rate": 1.0,
+      "policy_mode": "oracle",
+      "primitive_steps": 28,
+      "steps_saved": 18,
+      "successful_macro_calls": 6
+    },
+    {
+      "action_scope": "task",
       "agent_decisions": 14,
       "attempted_macro_calls": 8,
       "coverage_ratio": 0.8571,
@@ -904,44 +989,23 @@
       "decision_reduction_ratio": 0.5,
       "episodes": 4,
       "failed_macro_calls": 0,
-      "label": "Oracle selector",
-      "macro_hits": {
-        "generic_click_choice_then_click_choice_then_click_button_m005": 3,
-        "generic_click_input_then_click_input_m007": 2,
-        "generic_click_link_then_click_text_then_choose_requested_value_from_list_m001": 3
-      },
-      "macro_success_rate": 1.0,
-      "policy_mode": "oracle",
-      "primitive_steps": 28,
-      "steps_saved": 14,
-      "successful_macro_calls": 8
-    },
-    {
-      "action_scope": "task",
-      "agent_decisions": 17,
-      "attempted_macro_calls": 11,
-      "coverage_ratio": 0.8571,
-      "covered_primitive_steps": 24,
-      "decision_reduction_ratio": 0.3929,
-      "episodes": 4,
-      "failed_macro_calls": 3,
       "label": "Learned selector",
       "macro_hits": {
         "generic_click_choice_then_click_choice_then_click_button_m005": 3,
         "generic_click_input_then_click_input_m007": 2,
         "generic_click_link_then_click_text_then_choose_requested_value_from_list_m001": 3
       },
-      "macro_success_rate": 0.7273,
+      "macro_success_rate": 1.0,
       "model": {
-        "epochs": 8,
+        "epochs": 20,
         "model_type": "averaged_perceptron",
-        "nonzero_weights": 167,
+        "nonzero_weights": 208,
         "training_examples": 93,
-        "updates": 224
+        "updates": 799
       },
       "policy_mode": "learned",
       "primitive_steps": 28,
-      "steps_saved": 11,
+      "steps_saved": 14,
       "successful_macro_calls": 8
     },
     {
@@ -967,23 +1031,24 @@
     },
     {
       "action_scope": "task",
-      "agent_decisions": 40,
-      "attempted_macro_calls": 35,
+      "agent_decisions": 31,
+      "attempted_macro_calls": 27,
       "coverage_ratio": 0.8571,
       "covered_primitive_steps": 24,
-      "decision_reduction_ratio": -0.4286,
+      "decision_reduction_ratio": -0.1071,
       "episodes": 4,
-      "failed_macro_calls": 29,
+      "failed_macro_calls": 21,
       "label": "Semantic no guard",
       "macro_hits": {
-        "generic_click_choice_then_click_button_m004": 3,
+        "generic_click_choice_then_click_button_m004": 2,
+        "generic_click_choice_then_click_choice_then_click_button_m005": 1,
         "generic_click_link_then_click_text_then_choose_requested_value_from_list_m001": 1,
         "generic_click_link_then_click_text_then_choose_requested_value_from_list_m010": 2
       },
-      "macro_success_rate": 0.1714,
+      "macro_success_rate": 0.2222,
       "policy_mode": "semantic",
       "primitive_steps": 28,
-      "steps_saved": -12,
+      "steps_saved": -3,
       "successful_macro_calls": 6
     }
   ],

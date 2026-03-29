@@ -36,10 +36,12 @@ def build_summary() -> dict:
     miniwob_replay = load_json(ROOT / "outputs" / "miniwob_live_v3_stable_benchmark.json")
     workarena_service_catalog = load_json(ROOT / "outputs" / "workarena_service_catalog_v1_benchmark.json")
     workarena_service_catalog_sweep = load_json(ROOT / "outputs" / "workarena_service_catalog_v1_split_sweep.json")
-    workarena_selector_oracle = load_json(ROOT / "outputs" / "workarena_service_catalog_v1_oracle_selector.json")
-    workarena_selector_semantic_guard = load_json(ROOT / "outputs" / "workarena_service_catalog_v1_semantic_guard_selector.json")
-    workarena_selector_semantic_noguard = load_json(ROOT / "outputs" / "workarena_service_catalog_v1_semantic_noguard_selector.json")
-    workarena_selector_learned = load_json(ROOT / "outputs" / "workarena_service_catalog_v1_learned_noguard_selector.json")
+    workarena_selector_oracle = load_json(ROOT / "outputs" / "workarena_service_catalog_v1_oracle_selector_v2.json")
+    workarena_selector_semantic_guard = load_json(ROOT / "outputs" / "workarena_service_catalog_v1_semantic_guard_selector_v2.json")
+    workarena_selector_semantic_noguard = load_json(ROOT / "outputs" / "workarena_service_catalog_v1_semantic_noguard_selector_v2.json")
+    workarena_selector_learned = load_json(ROOT / "outputs" / "workarena_service_catalog_v1_learned_noguard_selector_v2_e20.json")
+    mind2web_selector_oracle = load_json(ROOT / "outputs" / "mind2web_site_task_family_oracle_selector.json")
+    mind2web_selector_learned = load_json(ROOT / "outputs" / "mind2web_site_task_family_learned_noguard_selector.json")
     miniwob_local_oracle = load_json(ROOT / "outputs" / "miniwob_live_v3_policy_oracle_v2_macro_policy_benchmark.json")
     miniwob_global_exact = load_json(ROOT / "outputs" / "miniwob_live_v3_global_oracle_macro_policy_benchmark.json")
     miniwob_global_trigger2 = load_json(ROOT / "outputs" / "miniwob_live_v3_global_trigger_macro_policy_benchmark.json")
@@ -94,6 +96,8 @@ def build_summary() -> dict:
             "mind2web_best_hierarchy": next(
                 item["summary"] for item in mind2web_hierarchy["variants"] if item["name"] == "exact_then_site_r07"
             ),
+            "mind2web_selector_oracle": mind2web_selector_oracle["summary"],
+            "mind2web_selector_learned": mind2web_selector_learned["summary"],
             "workarena_service_catalog": workarena_service_catalog["summary"],
             "workarena_service_catalog_sweep": workarena_service_catalog_sweep,
             "workarena_selector_oracle": workarena_selector_oracle["summary"],

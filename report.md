@@ -1572,16 +1572,16 @@ Current WorkArena service-catalog selector results on the held-out split:
   - `28 -> 10`
   - `64.29%` decision reduction
 - oracle selector over the promoted action space:
-  - `28 -> 14`
-  - `50.0%` decision reduction
+  - `28 -> 10`
+  - `64.29%` decision reduction
   - `0` failed macro calls
 - learned selector, no explicit guard:
-  - `28 -> 17`
-  - `39.29%` decision reduction
-  - `11` attempted macro calls
+  - `28 -> 14`
+  - `50.0%` decision reduction
+  - `8` attempted macro calls
   - `8` successful macro calls
-  - `3` failed macro calls
-  - `72.73%` macro success
+  - `0` failed macro calls
+  - `100%` macro success
 - semantic lexical selector with a first-step guard:
   - `28 -> 17`
   - `39.29%` decision reduction
@@ -1600,7 +1600,8 @@ Figure:
 Interpretation:
 
 - the replay upper bound is real and large
-- a selector can recover a large fraction of it on a real benchmark site
+- a selector can now recover **all** of it in the oracle setting on a real benchmark site
+- a tiny learned chooser can recover most of it on the current slice
 - names and descriptions **alone** are not enough
 - some form of structural prior is still crucial:
   - either a cheap first-step compatibility check
@@ -1610,11 +1611,12 @@ This is an important update because it sharpens the bottleneck:
 
 - discovery is no longer the main question on dense repeated families
 - the harder problem is now **selection quality**
-- even on WorkArena, the gap between `64.29%` and `39.29-50.0%` is mostly about choosing the right macro at the right moment
+- with utility-aware ranking, the oracle selector now matches the replay-compression upper bound exactly
+- the remaining practical gap is between that oracle and the learned chooser, not between compression and macro exposure
 
 The positive part is that this now looks tractable:
 
-- the learned selector already recovers most of the guarded semantic policy
+- the learned selector reaches `50%` reduction with zero failed macro calls on the current slice
 - the remaining loss looks much smaller than the earlier Mind2Web coverage loss
 - this is exactly the sort of gap that should shrink with more family-level traces, better context features, and eventually a real model-based chooser
 
@@ -1735,6 +1737,21 @@ The practical implication is:
 - if we want `50%`-scale savings on broader browser benchmarks, we need much better coverage and stronger page-state-aware macro masks
 - simply mining more chunks from the current data is unlikely to be enough
 - the MiniWoB learned-selector result is encouraging, but it does not remove the broader coverage problem
+
+The new named-selector replay runs make that even clearer:
+
+- Mind2Web site+task-family oracle selector:
+  - `3604 -> 3575`
+  - `0.80%` decision reduction
+  - `17` successful macro calls
+  - `0` failures
+- Mind2Web site+task-family learned selector, no guard:
+  - `3604 -> 3598`
+  - `0.17%` decision reduction
+  - `7` successful macro calls
+  - `1` failed macro call
+
+So on Mind2Web, even a perfect selector barely moves the total because the promoted registry simply does not cover much of the held-out trajectory mass.
 
 Current results for `dataflow_coarse`:
 
@@ -1962,6 +1979,10 @@ Then promote the repeated chunks into named tools only after they survive held-o
     - a first-step compatibility check
     - a page-state mask
     - or a learned chooser over the named actions
+
+    When ranking candidate macros, optimize for **expected savings**, not replay precision alone.
+    A simple effective proxy is:
+    - `expected_gain = replay_precision * (macro_length - 1)`
 
 11. Expand macros to primitive steps with fallback on mismatch.
 
