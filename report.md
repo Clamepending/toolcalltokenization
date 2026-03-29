@@ -1620,6 +1620,124 @@ The positive part is that this now looks tractable:
 - the remaining loss looks much smaller than the earlier Mind2Web coverage loss
 - this is exactly the sort of gap that should shrink with more family-level traces, better context features, and eventually a real model-based chooser
 
+### No-training LLM chooser over named actions
+
+The next question was whether we could skip selector training entirely and simply hand the promoted macros to a model as named tools.
+
+We now have an OpenAI-compatible chooser in:
+
+- `toolcalltokenization/llm_client.py`
+- `scripts/run_miniwob_llm_policy_benchmark.py`
+- `scripts/run_selector_replay_benchmark.py` with `--policy-mode llm`
+
+This controller is intentionally simple:
+
+- it sees the current task/context
+- it sees primitive actions plus named macro candidates
+- it chooses one action id
+- there is **no additional training**
+- primitive fallback still protects task success
+
+#### MiniWoB live LLM result
+
+On the stable shared MiniWoB action space, the no-training LLM result is now:
+
+- no guard:
+  - `80 -> 69`
+  - `13.75%` decision reduction
+  - `22` failed macro calls
+  - `53.19%` macro success
+  - `170,958` total tokens
+- one-step structural guard:
+  - `80 -> 43`
+  - `46.25%` decision reduction
+  - `0` failed macro calls
+  - `100%` macro success
+  - `23,381` total tokens
+- tiny learned selector:
+  - `80 -> 32`
+  - `60.0%` decision reduction
+  - `0` failed macro calls
+
+So on live browser episodes, a no-training LLM **can** use named macros, but only after the action space is narrowed by a lightweight structural guard.
+
+The strongest remaining MiniWoB failure is no longer bad macro execution. It is **under-calling** on ambiguous-but-valid macros.
+
+The clearest example is `form_sequence_2`:
+
+- the guarded LLM chose **zero** macros there
+- the learned selector compresses the same family perfectly
+
+Why? The LLM saw prototype-specific step text such as:
+
+- `radio_1`
+- `textbox_3`
+
+and inferred that the macro was too specific to reuse on episodes involving `radio_3` or `textbox_2`, even though the macro abstraction was intended to be generic at the level of:
+
+- `click choice`
+- `fill field`
+- `click submit`
+
+This is a useful new insight:
+
+- making macro descriptions **too generic** causes over-triggering
+- making them **too exemplar-specific** causes under-generalization
+
+So the semantic presentation problem has a real Goldilocks zone.
+
+#### WorkArena replay LLM result
+
+We then ran the same no-training LLM idea on the held-out WorkArena service-catalog selector benchmark.
+
+Results:
+
+- learned selector:
+  - `28 -> 14`
+  - `50.0%` decision reduction
+- oracle selector:
+  - `28 -> 10`
+  - `64.29%` decision reduction
+- LLM + guard, baseline prompt:
+  - `28 -> 19`
+  - `32.14%` decision reduction
+  - `3` failed macro calls
+- LLM + guard, with richer step-detail prompt:
+  - `28 -> 23`
+  - `17.86%` decision reduction
+  - `2` failed macro calls
+
+Figure:
+
+![LLM policy sweep](docs/figures/llm_policy_sweep.svg)
+
+This is a strong negative result for “just give the macros to an LLM and let it figure it out.”
+
+On WorkArena, the LLM is hurt by two opposite forces:
+
+1. **Crowded generic macro families**
+   Several promoted macros start with the same `click link -> click item -> select quantity` prefix, so the LLM over-selects long macros whose overall task story sounds right.
+
+2. **Prototype leakage in detailed descriptions**
+   When we exposed more readable step outlines, the model started anchoring on example-specific labels and under-generalized.
+
+That means prompt polish alone did **not** close the selector gap.
+
+Current conclusion from the no-training LLM study:
+
+- named macros are useful and understandable enough for a model to exploit on simple live browser tasks
+- semantic naming alone is **not** a universal replacement for structural filtering
+- a practical browser-agent algorithm still needs:
+  - a lightweight structural mask / guard
+  - or a learned ranker over the named action space
+  - plus primitive fallback
+
+This is probably the most important controller-side result so far, because it explains why the learned selector consistently beats the untrained semantic chooser:
+
+- the model has to reason about **exact next-step compatibility**
+- not just whether a macro sounds relevant to the overall task
+- and that distinction is especially sharp once many macros share similar beginnings
+
 ### Savings and replay metrics
 
 We now have two small evaluation scripts:

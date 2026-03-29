@@ -1,6 +1,7 @@
 {
   "failure_attribution": "/Users/mark/Desktop/projects/toolcalltokenization/docs/figures/miniwob_false_trigger_attribution.svg",
   "global_sweep": "/Users/mark/Desktop/projects/toolcalltokenization/docs/figures/miniwob_global_trigger_sweep.svg",
+  "llm_policy_sweep": "/Users/mark/Desktop/projects/toolcalltokenization/docs/figures/llm_policy_sweep.svg",
   "mind2web_hierarchy": "/Users/mark/Desktop/projects/toolcalltokenization/docs/figures/mind2web_hierarchy_sweep.svg",
   "overview": "/Users/mark/Desktop/projects/toolcalltokenization/docs/figures/action_chunking_overview.svg",
   "semantic_policy_sweep": "/Users/mark/Desktop/projects/toolcalltokenization/docs/figures/miniwob_semantic_policy_sweep.svg",

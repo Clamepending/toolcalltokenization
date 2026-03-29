@@ -6,6 +6,7 @@ from urllib.parse import urlsplit
 import random
 import re
 
+from .llm_client import CachedOpenAIChooser
 from .trace_utils import group_rows, group_sequences, represent_rows, split_sequences
 
 
@@ -675,6 +676,45 @@ def learned_choice(
     return {"kind": "macro", "score": best_score, "macro": best["macro"], "macro_id": best["id"]}
 
 
+def llm_choice(
+    *,
+    chooser: CachedOpenAIChooser,
+    row: dict,
+    previous_actions: Sequence[str],
+    macros: Sequence[dict],
+    blocked_macro_ids: Sequence[str],
+    use_start_step_guard: bool,
+) -> dict:
+    candidates = candidate_set(
+        row=row,
+        macros=macros,
+        blocked_macro_ids=blocked_macro_ids,
+        use_start_step_guard=use_start_step_guard,
+    )
+    result = chooser.choose(
+        goal=str(row.get("task") or row.get("confirmed_task") or ""),
+        context_text=row_context_text(row, previous_actions),
+        candidates=candidates,
+    )
+    chosen_id = str(result.get("id", "__primitive__"))
+    chosen = next((candidate for candidate in candidates if candidate["id"] == chosen_id), candidates[0])
+    base = {
+        "score": 0.0,
+        "llm_reason": str(result.get("reason", "")),
+        "llm_cached": bool(result.get("cached", False)),
+        "llm_usage": dict(result.get("usage", {})),
+        "llm_raw_content": str(result.get("raw_content", "")),
+    }
+    if chosen["kind"] == "primitive":
+        return {"kind": "primitive", **base}
+    return {
+        "kind": "macro",
+        "macro": chosen["macro"],
+        "macro_id": chosen["id"],
+        **base,
+    }
+
+
 def evaluate_selector_replay(
     rows: Sequence[dict],
     registry_payload: dict,
@@ -689,6 +729,7 @@ def evaluate_selector_replay(
     use_start_step_guard: bool = True,
     training_epochs: int = 8,
     training_seed: int = 0,
+    llm_chooser: CachedOpenAIChooser | None = None,
 ) -> dict:
     train_ids_by_group, eval_ids_by_group = split_train_eval_episode_ids(
         rows,
@@ -715,6 +756,8 @@ def evaluate_selector_replay(
             use_start_step_guard=use_start_step_guard,
         )
         model = train_learned_selector(examples, epochs=training_epochs, seed=training_seed)
+    elif policy_mode == "llm" and llm_chooser is None:
+        raise ValueError("LLM policy requested without llm_chooser.")
 
     total_primitive_steps = 0
     total_agent_decisions = 0
@@ -724,6 +767,10 @@ def evaluate_selector_replay(
     total_covered_steps = 0
     total_episodes = 0
     macro_hits: Counter = Counter()
+    total_llm_calls = 0
+    total_llm_cached_calls = 0
+    total_llm_prompt_tokens = 0
+    total_llm_completion_tokens = 0
     groups = []
 
     for group_key, eval_ids in sorted(eval_ids_by_group.items()):
@@ -750,6 +797,10 @@ def evaluate_selector_replay(
             blocked_macros_by_index: Dict[int, set[str]] = defaultdict(set)
             previous_actions: List[str] = []
             choice_trace: List[dict] = []
+            llm_calls = 0
+            llm_cached_calls = 0
+            llm_prompt_tokens = 0
+            llm_completion_tokens = 0
 
             while index < len(rows_for_episode):
                 row = rows_for_episode[index]
@@ -776,6 +827,23 @@ def evaluate_selector_replay(
                         blocked_macro_ids=blocked_macros_by_index[index],
                         use_start_step_guard=use_start_step_guard,
                     )
+                elif policy_mode == "llm":
+                    if llm_chooser is None:
+                        raise ValueError("LLM policy requested without llm_chooser.")
+                    choice = llm_choice(
+                        chooser=llm_chooser,
+                        row=row,
+                        previous_actions=previous_actions,
+                        macros=macros,
+                        blocked_macro_ids=blocked_macros_by_index[index],
+                        use_start_step_guard=use_start_step_guard,
+                    )
+                    llm_calls += 1
+                    usage = dict(choice.get("llm_usage", {}))
+                    llm_prompt_tokens += int(usage.get("prompt_tokens", 0))
+                    llm_completion_tokens += int(usage.get("completion_tokens", 0))
+                    if choice.get("llm_cached"):
+                        llm_cached_calls += 1
                 else:
                     raise ValueError(f"Unsupported policy_mode: {policy_mode!r}")
 
@@ -792,6 +860,8 @@ def evaluate_selector_replay(
                             "choice": "macro",
                             "macro_id": macro_id,
                             "score": round(float(choice.get("score", 0.0)), 3),
+                            "llm_reason": str(choice.get("llm_reason", "")),
+                            "llm_cached": bool(choice.get("llm_cached", False)),
                         }
                     )
                     if current_sequence != list(macro.get("sequence", [])):
@@ -805,7 +875,14 @@ def evaluate_selector_replay(
                     continue
 
                 agent_decisions += 1
-                choice_trace.append({"index": index, "choice": "primitive"})
+                choice_trace.append(
+                    {
+                        "index": index,
+                        "choice": "primitive",
+                        "llm_reason": str(choice.get("llm_reason", "")),
+                        "llm_cached": bool(choice.get("llm_cached", False)),
+                    }
+                )
                 previous_actions.append(sequence[index])
                 index += 1
 
@@ -817,6 +894,10 @@ def evaluate_selector_replay(
             total_failed_macro_calls += failed_macro_calls
             total_episodes += 1
             macro_hits.update(episode_macro_hits)
+            total_llm_calls += llm_calls
+            total_llm_cached_calls += llm_cached_calls
+            total_llm_prompt_tokens += llm_prompt_tokens
+            total_llm_completion_tokens += llm_completion_tokens
             group_reports.append(
                 {
                     "episode_id": episode_id,
@@ -828,6 +909,10 @@ def evaluate_selector_replay(
                     "failed_macro_calls": failed_macro_calls,
                     "macro_hits": dict(episode_macro_hits),
                     "choice_trace": choice_trace,
+                    "llm_calls": llm_calls,
+                    "llm_cached_calls": llm_cached_calls,
+                    "llm_prompt_tokens": llm_prompt_tokens,
+                    "llm_completion_tokens": llm_completion_tokens,
                 }
             )
 
@@ -851,6 +936,10 @@ def evaluate_selector_replay(
                     "attempted_macro_calls": sum(item["attempted_macro_calls"] for item in group_reports),
                     "successful_macro_calls": sum(item["successful_macro_calls"] for item in group_reports),
                     "failed_macro_calls": sum(item["failed_macro_calls"] for item in group_reports),
+                    "llm_calls": sum(item.get("llm_calls", 0) for item in group_reports),
+                    "llm_cached_calls": sum(item.get("llm_cached_calls", 0) for item in group_reports),
+                    "llm_prompt_tokens": sum(item.get("llm_prompt_tokens", 0) for item in group_reports),
+                    "llm_completion_tokens": sum(item.get("llm_completion_tokens", 0) for item in group_reports),
                 },
             }
         )
@@ -884,4 +973,10 @@ def evaluate_selector_replay(
             "updates": model.get("updates"),
             "nonzero_weights": len(model.get("weights", {})),
         }
+    if policy_mode == "llm":
+        summary["llm_calls"] = total_llm_calls
+        summary["llm_cached_calls"] = total_llm_cached_calls
+        summary["llm_prompt_tokens"] = total_llm_prompt_tokens
+        summary["llm_completion_tokens"] = total_llm_completion_tokens
+        summary["llm_total_tokens"] = total_llm_prompt_tokens + total_llm_completion_tokens
     return {"summary": summary, "groups": groups}

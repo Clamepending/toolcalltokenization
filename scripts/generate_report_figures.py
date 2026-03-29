@@ -55,7 +55,11 @@ def build_summary() -> dict:
     miniwob_semantic_global_guard_bias = load_json(ROOT / "outputs" / "miniwob_live_v3_semantic_global_guard_v4_stable_mneg1_semantic_policy_benchmark.json")
     miniwob_learned_global_guard = load_json(ROOT / "outputs" / "miniwob_live_v3_learned_global_guard_stable_learned_policy_benchmark.json")
     miniwob_learned_global_noguard = load_json(ROOT / "outputs" / "miniwob_live_v3_learned_global_noguard_stable_learned_policy_benchmark.json")
+    miniwob_llm_global_guard = load_json(ROOT / "outputs" / "miniwob_live_v3_llm_global_guard_stable_v2_llm_policy_benchmark.json")
+    miniwob_llm_global_noguard = load_json(ROOT / "outputs" / "miniwob_live_v3_llm_global_noguard_stable_v2_llm_policy_benchmark.json")
     trigger1_registry = load_json(ROOT / "outputs" / "miniwob_live_v3_global_trigger_p1_v3_macro_registry.json")
+    workarena_selector_llm_guard = load_json(ROOT / "outputs" / "workarena_service_catalog_v1_llm_guard_selector.json")
+    workarena_selector_llm_guard_v2 = load_json(ROOT / "outputs" / "workarena_service_catalog_v1_llm_guard_selector_v2.json")
 
     mind2web_covered_steps = sum(
         group["summary"]["primitive_steps"]
@@ -104,6 +108,8 @@ def build_summary() -> dict:
             "workarena_selector_semantic_guard": workarena_selector_semantic_guard["summary"],
             "workarena_selector_semantic_noguard": workarena_selector_semantic_noguard["summary"],
             "workarena_selector_learned": workarena_selector_learned["summary"],
+            "workarena_selector_llm_guard": workarena_selector_llm_guard["summary"],
+            "workarena_selector_llm_guard_v2": workarena_selector_llm_guard_v2["summary"],
             "miniwob_stable_replay_upper_bound": miniwob_replay["summary"],
             "miniwob_local_oracle": miniwob_local_oracle["summary"],
             "miniwob_global_exact": miniwob_global_exact["summary"],
@@ -116,6 +122,8 @@ def build_summary() -> dict:
             "miniwob_semantic_global_guard_bias": miniwob_semantic_global_guard_bias["summary"],
             "miniwob_learned_global_guard": miniwob_learned_global_guard["summary"],
             "miniwob_learned_global_noguard": miniwob_learned_global_noguard["summary"],
+            "miniwob_llm_global_guard": miniwob_llm_global_guard["summary"],
+            "miniwob_llm_global_noguard": miniwob_llm_global_noguard["summary"],
         },
         "mind2web_hierarchy_sweep": mind2web_hierarchy["variants"],
         "workarena_service_catalog_sweep": workarena_service_catalog_sweep["runs"],
@@ -123,6 +131,7 @@ def build_summary() -> dict:
             {"label": "Replay upper bound", **workarena_service_catalog["summary"]},
             {"label": "Oracle selector", **workarena_selector_oracle["summary"]},
             {"label": "Learned selector", **workarena_selector_learned["summary"]},
+            {"label": "LLM + guard", **workarena_selector_llm_guard["summary"]},
             {"label": "Semantic + guard", **workarena_selector_semantic_guard["summary"]},
             {"label": "Semantic no guard", **workarena_selector_semantic_noguard["summary"]},
         ],
@@ -142,6 +151,21 @@ def build_summary() -> dict:
             {"label": "Prefix 2-step", **miniwob_global_taskregistry_trigger["summary"]},
             {"label": "Exact upper bound", **miniwob_global_taskregistry_oracle["summary"]},
         ],
+        "llm_policy_sweep": {
+            "miniwob": [
+                {"label": "LLM no guard", **miniwob_llm_global_noguard["summary"]},
+                {"label": "LLM + 1-step guard", **miniwob_llm_global_guard["summary"]},
+                {"label": "Learned selector", **miniwob_learned_global_noguard["summary"]},
+                {"label": "Exact upper bound", **miniwob_global_taskregistry_oracle["summary"]},
+            ],
+            "workarena": [
+                {"label": "LLM + guard", **workarena_selector_llm_guard["summary"]},
+                {"label": "LLM + guard + detailed steps", **workarena_selector_llm_guard_v2["summary"]},
+                {"label": "Learned selector", **workarena_selector_learned["summary"]},
+                {"label": "Oracle selector", **workarena_selector_oracle["summary"]},
+                {"label": "Replay upper bound", **workarena_service_catalog["summary"]},
+            ],
+        },
         "global_trigger_failures": {
             "failed_by_macro": failed_by_macro,
             "failed_by_task": failed_by_task,
@@ -471,6 +495,87 @@ def plot_semantic_policy_sweep(summary: dict) -> Path:
     return output
 
 
+def plot_llm_policy_sweep(summary: dict) -> Path:
+    sweep = summary["llm_policy_sweep"]
+    miniwob = sweep["miniwob"]
+    workarena = sweep["workarena"]
+
+    fig, axes = plt.subplots(2, 1, figsize=(10.6, 7.8), gridspec_kw={"height_ratios": [1, 1]})
+
+    for ax, title, items, colors in [
+        (
+            axes[0],
+            "MiniWoB live: a no-training LLM uses named macros only when a lightweight guard narrows the action space",
+            miniwob,
+            ["#b23a48", "#2a9d8f", "#5a189a", "#6a994e"],
+        ),
+        (
+            axes[1],
+            "WorkArena replay: generic crowded macros remain hard for a no-training LLM, even with prompt polish",
+            workarena,
+            ["#457b9d", "#bc6c25", "#5a189a", "#1d3557", "#6a994e"],
+        ),
+    ]:
+        labels = [item["label"] for item in items]
+        reductions = [percent(item["decision_reduction_ratio"]) for item in items]
+        bars = ax.bar(labels, reductions, color=colors)
+        ax.set_ylabel("Decision Reduction (%)")
+        ax.set_title(title)
+        ymin = min(0, min(reductions) * 1.2)
+        ymax = max(reductions) * 1.2
+        ax.set_ylim(ymin, ymax)
+        ax.grid(axis="y", alpha=0.25)
+        for bar, value in zip(bars, reductions):
+            offset = 0.8 if value >= 0 else -1.5
+            va = "bottom" if value >= 0 else "top"
+            ax.text(bar.get_x() + bar.get_width() / 2, value + offset, f"{value:.1f}%", ha="center", va=va)
+
+    axes[0].text(
+        0,
+        percent(miniwob[0]["decision_reduction_ratio"]) + 3.0,
+        f"{miniwob[0]['failed_macro_calls']} failed calls\n{miniwob[0]['llm_total_tokens']:,} tokens",
+        ha="center",
+        va="bottom",
+        fontsize=9,
+        color="#7f1d1d",
+    )
+    axes[0].text(
+        1,
+        percent(miniwob[1]["decision_reduction_ratio"]) + 3.0,
+        f"{miniwob[1]['failed_macro_calls']} failed calls\n{miniwob[1]['llm_total_tokens']:,} tokens",
+        ha="center",
+        va="bottom",
+        fontsize=9,
+        color="#0b6e4f",
+    )
+    axes[1].text(
+        0,
+        percent(workarena[0]["decision_reduction_ratio"]) + 3.0,
+        f"{workarena[0]['failed_macro_calls']} failed calls",
+        ha="center",
+        va="bottom",
+        fontsize=9,
+        color="#1d3557",
+    )
+    axes[1].text(
+        1,
+        percent(workarena[1]["decision_reduction_ratio"]) + 3.0,
+        "More detailed step text\nhurt generalization",
+        ha="center",
+        va="bottom",
+        fontsize=9,
+        color="#8c510a",
+    )
+
+    axes[0].tick_params(axis="x", rotation=12)
+    axes[1].tick_params(axis="x", rotation=12)
+    fig.tight_layout()
+    output = DOCS_FIGURES / "llm_policy_sweep.svg"
+    fig.savefig(output, bbox_inches="tight")
+    plt.close(fig)
+    return output
+
+
 def main() -> None:
     DOCS_DATA.mkdir(parents=True, exist_ok=True)
     DOCS_FIGURES.mkdir(parents=True, exist_ok=True)
@@ -485,6 +590,7 @@ def main() -> None:
         "global_sweep": str(plot_global_sweep(summary)),
         "failure_attribution": str(plot_failure_attribution(summary)),
         "semantic_policy_sweep": str(plot_semantic_policy_sweep(summary)),
+        "llm_policy_sweep": str(plot_llm_policy_sweep(summary)),
     }
     dump_json(str(DOCS_DATA / "action_chunking_figures.json"), outputs)
 
