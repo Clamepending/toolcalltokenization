@@ -1313,22 +1313,26 @@ These are the current project decisions based on the evidence above.
 
 We also pushed on the original BrowserGym + AgentLab + WorkArena path.
 
-What worked:
+What now works:
 
 - `uv` successfully installed a local Python `3.11`
-- BrowserGym MiniWoB ran in `.venvbg`
+- BrowserGym MiniWoB runs in `.venvbg`
+- `browsergym-workarena` now installs in `.venvbg`
+- `agentlab` now installs in `.venvbg`
+- WorkArena environments are registered locally through Gymnasium
 
 What is still blocked for WorkArena on this machine:
 
-- system Python is `3.9`, while BrowserGym uses Python features that require `3.10+`
-- `agentlab` did not install in the `3.9` env because of downstream dependency availability
-- `browsergym-workarena` requires `playwright==1.44.0`
-- WorkArena also needs gated ServiceNow instance access through Hugging Face
+- WorkArena reset fails without gated ServiceNow instance access through Hugging Face
+- the concrete failure is:
+  `RuntimeError: Could not access ServiceNow/WorkArena-Instances/instances_v2.json`
+- the package stack is no longer the main blocker
+- the remaining blocker is external authentication / permission to the gated WorkArena instance manifest
 
 So the practical benchmark sequence is now:
 
 1. MiniWoB first, because it is public and runnable now
-2. WorkArena next, once we isolate the required Python / Playwright stack and have instance access
+2. WorkArena next, once we have Hugging Face access to `ServiceNow/WorkArena-Instances` and a valid `HUGGING_FACE_HUB_TOKEN`
 
 ### Savings and replay metrics
 
