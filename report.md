@@ -1543,6 +1543,81 @@ So the WorkArena win is not just memorizing one exact task template. It comes fr
 
 That is exactly the kind of cross-instance redundancy we want for higher-level browser tools.
 
+### WorkArena named-selector benchmark
+
+The first WorkArena result above is still a **replay upper bound**:
+
+- it measures how much the promoted registry can compress held-out traces
+- it does **not** yet ask a controller to choose between primitives and named macros online
+
+To close that gap, we added a generic replay selector benchmark:
+
+- `toolcalltokenization/selector_benchmark.py`
+- `scripts/run_selector_replay_benchmark.py`
+
+This benchmark is intentionally simple and dataset-agnostic:
+
+- load trace rows plus a promoted registry
+- expose primitives plus named macro tools
+- let a selector choose at each step
+- if a chosen macro does not exactly match the held-out remaining trace, count it as a failed macro call and fall back
+
+This is still not a live LLM agent, but it is much closer to the thing we ultimately care about:
+
+- does a named-action controller actually recover the replay-compression benefit?
+
+Current WorkArena service-catalog selector results on the held-out split:
+
+- replay compression upper bound:
+  - `28 -> 10`
+  - `64.29%` decision reduction
+- oracle selector over the promoted action space:
+  - `28 -> 14`
+  - `50.0%` decision reduction
+  - `0` failed macro calls
+- learned selector, no explicit guard:
+  - `28 -> 17`
+  - `39.29%` decision reduction
+  - `11` attempted macro calls
+  - `8` successful macro calls
+  - `3` failed macro calls
+  - `72.73%` macro success
+- semantic lexical selector with a first-step guard:
+  - `28 -> 17`
+  - `39.29%` decision reduction
+  - `5` failed macro calls
+  - `50.0%` macro success
+- semantic lexical selector with no guard:
+  - `28 -> 40`
+  - `-42.86%` decision reduction
+  - `29` failed macro calls
+  - `17.14%` macro success
+
+Figure:
+
+![WorkArena selector sweep](docs/figures/workarena_selector_sweep.svg)
+
+Interpretation:
+
+- the replay upper bound is real and large
+- a selector can recover a large fraction of it on a real benchmark site
+- names and descriptions **alone** are not enough
+- some form of structural prior is still crucial:
+  - either a cheap first-step compatibility check
+  - or a trained chooser that implicitly learns that structure
+
+This is an important update because it sharpens the bottleneck:
+
+- discovery is no longer the main question on dense repeated families
+- the harder problem is now **selection quality**
+- even on WorkArena, the gap between `64.29%` and `39.29-50.0%` is mostly about choosing the right macro at the right moment
+
+The positive part is that this now looks tractable:
+
+- the learned selector already recovers most of the guarded semantic policy
+- the remaining loss looks much smaller than the earlier Mind2Web coverage loss
+- this is exactly the sort of gap that should shrink with more family-level traces, better context features, and eventually a real model-based chooser
+
 ### Savings and replay metrics
 
 We now have two small evaluation scripts:
@@ -1718,6 +1793,217 @@ What looks unlikely to work:
 - claiming success from compression alone
 - relying on global mining alone to discover site-specific workflows
 
+## Current workflow of generating and using macros
+
+This is the current end-to-end pipeline in the repo.
+
+### 1. Collect or convert primitive traces
+
+We start from browser traces with a fixed primitive API:
+
+- `goto`
+- `click`
+- `type` / `fill`
+- `select`
+- plus a few browser utilities like tab operations or copy/paste when the source dataset supports them
+
+Data sources currently working:
+
+- public Mind2Web train shards
+- WebLINX BrowserGym replay sample
+- MiniWoB live BrowserGym traces
+- WorkArena live ServiceNow traces collected through `task.cheat(...)`
+
+### 2. Convert into one trace schema
+
+All sources are normalized into one JSONL event format with fields like:
+
+- `episode_id`
+- `task`
+- `step_index`
+- `action_type`
+- `target_role`
+- `target_label`
+- `value`
+- `url`
+
+This keeps the mining and evaluation code shared across datasets.
+
+### 3. Canonicalize into a stable representation
+
+Each trace is rendered into a canonical action sequence.
+
+The current best default is:
+
+- `dataflow_coarse`
+
+That means:
+
+- coarse role and label abstraction
+- literal values replaced by anonymous bindings like `B01`
+- copied or reused values tracked through `use=B01` and `def=B01`
+
+This is the key representation that turns raw browser traces into function-like templates instead of brittle page-specific strings.
+
+### 4. Mine candidate macros inside the right buckets
+
+We do **not** mine globally by default anymore.
+
+The best buckets so far are:
+
+- `website`
+- `website_task_family`
+- real benchmark families like WorkArena service-catalog ordering
+
+Inside each bucket we mine frequent contiguous chunks, currently up to length `6` by default, and keep the ones with enough distinct-episode support.
+
+### 5. Promote only the held-out-useful macros
+
+Support is not enough by itself.
+
+A macro gets promoted only if it clears held-out checks like:
+
+- cross-episode support
+- minimum length
+- held-out replay precision
+- held-out step savings
+- not being an obviously generic junk pattern
+
+That produces a registry of candidate tools with:
+
+- a sequence
+- step templates
+- input bindings
+- replay statistics
+- suggested names and descriptions
+
+### 6. Export a named action space
+
+The promoted registry is turned into an agent-facing action space:
+
+- primitive actions
+- promoted macro actions
+
+Each macro has:
+
+- a name
+- a description
+- parameters
+- preconditions
+- an expansion into primitive steps
+
+### 7. Let a controller choose between primitive and macro actions
+
+This is now supported in three increasingly realistic forms:
+
+1. offline compression
+   - upper bound only
+2. replay-time selector benchmark
+   - choose a named macro or a primitive at each step
+3. live browser benchmark
+   - already working on MiniWoB and trace-collected on WorkArena
+
+### 8. Expand macros with primitive fallback
+
+If the controller chooses a macro:
+
+- check basic compatibility
+- expand into primitive steps
+- if expansion or matching fails, fall back to primitive actions
+
+This fallback is what keeps the system safe while we test more ambitious macro libraries.
+
+## Minimal universal algorithm
+
+The current evidence suggests a simple universal recipe that should transfer across many browser-agent stacks.
+
+### Core idea
+
+Treat browser traces as a sequence-learning problem over:
+
+- primitive actions
+- coarse target structure
+- anonymous variable reuse
+
+Then promote the repeated chunks into named tools only after they survive held-out replay.
+
+### Minimal algorithm
+
+1. Define a small primitive browser API.
+   Keep it stable across platforms.
+
+2. Collect traces on repeated site or workflow families.
+   Density matters more than raw breadth.
+
+3. Convert traces into one normalized event schema.
+
+4. Canonicalize with `dataflow_coarse`.
+   This is the current best simple default.
+
+5. Group by the narrowest useful bucket.
+   Prefer:
+   - `site + workflow family`
+   - or benchmark family
+   over fully global mining.
+
+6. Mine contiguous macros with modest length limits.
+   Start around `2-6` steps before chasing longer chunks.
+
+7. Promote only held-out-useful macros.
+   Use replay precision, support, and saved steps, not frequency alone.
+
+8. Give each promoted macro a readable name and description.
+   This can be heuristic or LLM-assisted.
+
+9. Expose primitives plus macros in one action space.
+
+10. Use a controller with a light structural prior.
+    The prior can be:
+    - a first-step compatibility check
+    - a page-state mask
+    - or a learned chooser over the named actions
+
+11. Expand macros to primitive steps with fallback on mismatch.
+
+12. Measure both:
+    - upper-bound compression
+    - real macro-selection performance
+
+### Why this looks universal
+
+This recipe does **not** depend on:
+
+- Playwright specifically
+- BrowserGym specifically
+- semantic slot labels being perfect
+- a particular frontier model
+
+It only assumes:
+
+- a stable primitive action layer
+- trace access
+- a way to name and expose promoted chunks
+
+That makes it portable to:
+
+- Playwright agents
+- BrowserGym agents
+- DOM-based browser copilots
+- tool-calling LLM agents that operate over structured browser actions
+
+### Current best practical guidance
+
+If someone wanted the smallest version that is likely to work, the recommendation today would be:
+
+1. mine macros in `dataflow_coarse`
+2. bucket by site or workflow family
+3. promote only held-out-useful macros
+4. expose them as named tools
+5. add a simple structural guard or learned chooser
+6. keep primitive fallback
+
+That is the smallest algorithm that currently matches the evidence in this repo.
+
 ## Updated next steps
 
 The next work should be:
@@ -1734,17 +2020,21 @@ The next work should be:
    Examples:
    URL pattern, form step, result-list page, detail page
 
-4. Turn the new replay metrics into a site-family benchmark
+4. Push the new selector benchmark onto broader datasets
+   Examples:
+   Mind2Web site-local replay, WebLINX BrowserGym replay, and larger WorkArena family slices
+
+5. Turn the new replay metrics into a site-family benchmark
    Examples:
    per-site replay precision, per-site step savings, parameterized macro counts
 
-5. Measure real browser wall-clock time in a controlled benchmark
+6. Measure real browser wall-clock time in a controlled benchmark
    Use WorkArena-L1 or a small local Playwright benchmark.
 
-6. Keep raw-ish replay data in the loop
+7. Keep raw-ish replay data in the loop
    WebLINX BrowserGym stays useful even without raw Mind2Web traces.
 
-7. Treat raw Mind2Web `trace.zip` as a later upgrade
+8. Treat raw Mind2Web `trace.zip` as a later upgrade
    Useful for finer timing and Playwright-level replay, but no longer needed to answer the current question.
 
 ### Experiment 2: macro quality by source

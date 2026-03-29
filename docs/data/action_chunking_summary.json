@@ -546,6 +546,93 @@
       "steps_saved": 48,
       "success_rate": 1.0
     },
+    "workarena_selector_learned": {
+      "action_scope": "task",
+      "agent_decisions": 17,
+      "attempted_macro_calls": 11,
+      "coverage_ratio": 0.8571,
+      "covered_primitive_steps": 24,
+      "decision_reduction_ratio": 0.3929,
+      "episodes": 4,
+      "failed_macro_calls": 3,
+      "macro_hits": {
+        "generic_click_choice_then_click_choice_then_click_button_m005": 3,
+        "generic_click_input_then_click_input_m007": 2,
+        "generic_click_link_then_click_text_then_choose_requested_value_from_list_m001": 3
+      },
+      "macro_success_rate": 0.7273,
+      "model": {
+        "epochs": 8,
+        "model_type": "averaged_perceptron",
+        "nonzero_weights": 167,
+        "training_examples": 93,
+        "updates": 224
+      },
+      "policy_mode": "learned",
+      "primitive_steps": 28,
+      "steps_saved": 11,
+      "successful_macro_calls": 8
+    },
+    "workarena_selector_oracle": {
+      "action_scope": "task",
+      "agent_decisions": 14,
+      "attempted_macro_calls": 8,
+      "coverage_ratio": 0.8571,
+      "covered_primitive_steps": 24,
+      "decision_reduction_ratio": 0.5,
+      "episodes": 4,
+      "failed_macro_calls": 0,
+      "macro_hits": {
+        "generic_click_choice_then_click_choice_then_click_button_m005": 3,
+        "generic_click_input_then_click_input_m007": 2,
+        "generic_click_link_then_click_text_then_choose_requested_value_from_list_m001": 3
+      },
+      "macro_success_rate": 1.0,
+      "policy_mode": "oracle",
+      "primitive_steps": 28,
+      "steps_saved": 14,
+      "successful_macro_calls": 8
+    },
+    "workarena_selector_semantic_guard": {
+      "action_scope": "task",
+      "agent_decisions": 17,
+      "attempted_macro_calls": 10,
+      "coverage_ratio": 0.8571,
+      "covered_primitive_steps": 24,
+      "decision_reduction_ratio": 0.3929,
+      "episodes": 4,
+      "failed_macro_calls": 5,
+      "macro_hits": {
+        "generic_click_choice_then_click_button_m004": 2,
+        "generic_click_link_then_click_text_then_choose_requested_value_from_list_m001": 1,
+        "generic_click_link_then_click_text_then_choose_requested_value_from_list_m010": 2
+      },
+      "macro_success_rate": 0.5,
+      "policy_mode": "semantic",
+      "primitive_steps": 28,
+      "steps_saved": 11,
+      "successful_macro_calls": 5
+    },
+    "workarena_selector_semantic_noguard": {
+      "action_scope": "task",
+      "agent_decisions": 40,
+      "attempted_macro_calls": 35,
+      "coverage_ratio": 0.8571,
+      "covered_primitive_steps": 24,
+      "decision_reduction_ratio": -0.4286,
+      "episodes": 4,
+      "failed_macro_calls": 29,
+      "macro_hits": {
+        "generic_click_choice_then_click_button_m004": 3,
+        "generic_click_link_then_click_text_then_choose_requested_value_from_list_m001": 1,
+        "generic_click_link_then_click_text_then_choose_requested_value_from_list_m010": 2
+      },
+      "macro_success_rate": 0.1714,
+      "policy_mode": "semantic",
+      "primitive_steps": 28,
+      "steps_saved": -12,
+      "successful_macro_calls": 6
+    },
     "workarena_service_catalog": {
       "browser_time_ms": 30382.723,
       "decision_reduction_ratio": 0.6429,
@@ -786,6 +873,118 @@
       "steps_saved": 48,
       "success_rate": 1.0,
       "successful_macro_calls": 32
+    }
+  ],
+  "workarena_selector_sweep": [
+    {
+      "browser_time_ms": 30382.723,
+      "decision_reduction_ratio": 0.6429,
+      "episodes": 4,
+      "estimated_time_saved_ms": 18000.0,
+      "label": "Replay upper bound",
+      "macro_hits": {
+        "M001": 1,
+        "M004": 2,
+        "M005": 1,
+        "M017": 2
+      },
+      "macro_steps": 10,
+      "macro_total_time_ms": 40382.723,
+      "primitive_steps": 28,
+      "primitive_total_time_ms": 58382.723,
+      "steps_saved": 18,
+      "success_rate": 1.0
+    },
+    {
+      "action_scope": "task",
+      "agent_decisions": 14,
+      "attempted_macro_calls": 8,
+      "coverage_ratio": 0.8571,
+      "covered_primitive_steps": 24,
+      "decision_reduction_ratio": 0.5,
+      "episodes": 4,
+      "failed_macro_calls": 0,
+      "label": "Oracle selector",
+      "macro_hits": {
+        "generic_click_choice_then_click_choice_then_click_button_m005": 3,
+        "generic_click_input_then_click_input_m007": 2,
+        "generic_click_link_then_click_text_then_choose_requested_value_from_list_m001": 3
+      },
+      "macro_success_rate": 1.0,
+      "policy_mode": "oracle",
+      "primitive_steps": 28,
+      "steps_saved": 14,
+      "successful_macro_calls": 8
+    },
+    {
+      "action_scope": "task",
+      "agent_decisions": 17,
+      "attempted_macro_calls": 11,
+      "coverage_ratio": 0.8571,
+      "covered_primitive_steps": 24,
+      "decision_reduction_ratio": 0.3929,
+      "episodes": 4,
+      "failed_macro_calls": 3,
+      "label": "Learned selector",
+      "macro_hits": {
+        "generic_click_choice_then_click_choice_then_click_button_m005": 3,
+        "generic_click_input_then_click_input_m007": 2,
+        "generic_click_link_then_click_text_then_choose_requested_value_from_list_m001": 3
+      },
+      "macro_success_rate": 0.7273,
+      "model": {
+        "epochs": 8,
+        "model_type": "averaged_perceptron",
+        "nonzero_weights": 167,
+        "training_examples": 93,
+        "updates": 224
+      },
+      "policy_mode": "learned",
+      "primitive_steps": 28,
+      "steps_saved": 11,
+      "successful_macro_calls": 8
+    },
+    {
+      "action_scope": "task",
+      "agent_decisions": 17,
+      "attempted_macro_calls": 10,
+      "coverage_ratio": 0.8571,
+      "covered_primitive_steps": 24,
+      "decision_reduction_ratio": 0.3929,
+      "episodes": 4,
+      "failed_macro_calls": 5,
+      "label": "Semantic + guard",
+      "macro_hits": {
+        "generic_click_choice_then_click_button_m004": 2,
+        "generic_click_link_then_click_text_then_choose_requested_value_from_list_m001": 1,
+        "generic_click_link_then_click_text_then_choose_requested_value_from_list_m010": 2
+      },
+      "macro_success_rate": 0.5,
+      "policy_mode": "semantic",
+      "primitive_steps": 28,
+      "steps_saved": 11,
+      "successful_macro_calls": 5
+    },
+    {
+      "action_scope": "task",
+      "agent_decisions": 40,
+      "attempted_macro_calls": 35,
+      "coverage_ratio": 0.8571,
+      "covered_primitive_steps": 24,
+      "decision_reduction_ratio": -0.4286,
+      "episodes": 4,
+      "failed_macro_calls": 29,
+      "label": "Semantic no guard",
+      "macro_hits": {
+        "generic_click_choice_then_click_button_m004": 3,
+        "generic_click_link_then_click_text_then_choose_requested_value_from_list_m001": 1,
+        "generic_click_link_then_click_text_then_choose_requested_value_from_list_m010": 2
+      },
+      "macro_success_rate": 0.1714,
+      "policy_mode": "semantic",
+      "primitive_steps": 28,
+      "steps_saved": -12,
+      "successful_macro_calls": 6
     }
   ],
   "workarena_service_catalog_sweep": [

@@ -36,6 +36,10 @@ def build_summary() -> dict:
     miniwob_replay = load_json(ROOT / "outputs" / "miniwob_live_v3_stable_benchmark.json")
     workarena_service_catalog = load_json(ROOT / "outputs" / "workarena_service_catalog_v1_benchmark.json")
     workarena_service_catalog_sweep = load_json(ROOT / "outputs" / "workarena_service_catalog_v1_split_sweep.json")
+    workarena_selector_oracle = load_json(ROOT / "outputs" / "workarena_service_catalog_v1_oracle_selector.json")
+    workarena_selector_semantic_guard = load_json(ROOT / "outputs" / "workarena_service_catalog_v1_semantic_guard_selector.json")
+    workarena_selector_semantic_noguard = load_json(ROOT / "outputs" / "workarena_service_catalog_v1_semantic_noguard_selector.json")
+    workarena_selector_learned = load_json(ROOT / "outputs" / "workarena_service_catalog_v1_learned_noguard_selector.json")
     miniwob_local_oracle = load_json(ROOT / "outputs" / "miniwob_live_v3_policy_oracle_v2_macro_policy_benchmark.json")
     miniwob_global_exact = load_json(ROOT / "outputs" / "miniwob_live_v3_global_oracle_macro_policy_benchmark.json")
     miniwob_global_trigger2 = load_json(ROOT / "outputs" / "miniwob_live_v3_global_trigger_macro_policy_benchmark.json")
@@ -92,6 +96,10 @@ def build_summary() -> dict:
             ),
             "workarena_service_catalog": workarena_service_catalog["summary"],
             "workarena_service_catalog_sweep": workarena_service_catalog_sweep,
+            "workarena_selector_oracle": workarena_selector_oracle["summary"],
+            "workarena_selector_semantic_guard": workarena_selector_semantic_guard["summary"],
+            "workarena_selector_semantic_noguard": workarena_selector_semantic_noguard["summary"],
+            "workarena_selector_learned": workarena_selector_learned["summary"],
             "miniwob_stable_replay_upper_bound": miniwob_replay["summary"],
             "miniwob_local_oracle": miniwob_local_oracle["summary"],
             "miniwob_global_exact": miniwob_global_exact["summary"],
@@ -107,6 +115,13 @@ def build_summary() -> dict:
         },
         "mind2web_hierarchy_sweep": mind2web_hierarchy["variants"],
         "workarena_service_catalog_sweep": workarena_service_catalog_sweep["runs"],
+        "workarena_selector_sweep": [
+            {"label": "Replay upper bound", **workarena_service_catalog["summary"]},
+            {"label": "Oracle selector", **workarena_selector_oracle["summary"]},
+            {"label": "Learned selector", **workarena_selector_learned["summary"]},
+            {"label": "Semantic + guard", **workarena_selector_semantic_guard["summary"]},
+            {"label": "Semantic no guard", **workarena_selector_semantic_noguard["summary"]},
+        ],
         "global_trigger_sweep": [
             {"label": "Global exact", **miniwob_global_exact["summary"]},
             {"label": "Global 2-step", **miniwob_global_trigger2["summary"]},
@@ -296,6 +311,46 @@ def plot_workarena_service_catalog(summary: dict) -> Path:
     return output
 
 
+def plot_workarena_selector_sweep(summary: dict) -> Path:
+    sweep = summary["workarena_selector_sweep"]
+    labels = [item["label"] for item in sweep]
+    reductions = [percent(item["decision_reduction_ratio"]) for item in sweep]
+    failed_calls = [int(item.get("failed_macro_calls", 0)) for item in sweep]
+    macro_success = [percent(item.get("macro_success_rate", 1.0 if item["label"] == "Replay upper bound" else 0.0)) for item in sweep]
+
+    fig, axes = plt.subplots(2, 1, figsize=(10.2, 7.0), sharex=True, gridspec_kw={"height_ratios": [2, 1.5]})
+    colors = ["#6a994e", "#457b9d", "#5a189a", "#2a9d8f", "#b23a48"]
+
+    bars = axes[0].bar(labels, reductions, color=colors)
+    axes[0].set_ylabel("Decision Reduction (%)")
+    axes[0].set_title("On WorkArena, Selection Quality Accounts for Most of the Gap Between Replay Compression and Real Macro Use")
+    ymin = min(0, min(reductions) * 1.2)
+    ymax = max(reductions) * 1.25
+    axes[0].set_ylim(ymin, ymax)
+    axes[0].grid(axis="y", alpha=0.25)
+    for bar, value in zip(bars, reductions):
+        offset = 1.0 if value >= 0 else -2.0
+        va = "bottom" if value >= 0 else "top"
+        axes[0].text(bar.get_x() + bar.get_width() / 2, value + offset, f"{value:.1f}%", ha="center", va=va)
+
+    axes[1].bar(labels, failed_calls, color="#e76f51", alpha=0.85, label="Failed macro calls")
+    axes[1].set_ylabel("Failed Macro Calls")
+    axes[1].grid(axis="y", alpha=0.25)
+    twin = axes[1].twinx()
+    twin.plot(labels, macro_success, color="#264653", marker="o", linewidth=2, label="Macro success rate")
+    twin.set_ylabel("Macro Success (%)")
+    twin.set_ylim(0, 110)
+    for idx, value in enumerate(macro_success):
+        twin.text(idx, value + 3, f"{value:.1f}%", ha="center", va="bottom", color="#264653", fontsize=9)
+
+    axes[1].tick_params(axis="x", rotation=14)
+    fig.tight_layout()
+    output = DOCS_FIGURES / "workarena_selector_sweep.svg"
+    fig.savefig(output, bbox_inches="tight")
+    plt.close(fig)
+    return output
+
+
 def plot_global_sweep(summary: dict) -> Path:
     sweep = summary["global_trigger_sweep"]
     labels = [item["label"] for item in sweep]
@@ -422,6 +477,7 @@ def main() -> None:
         "overview": str(plot_overall(summary)),
         "mind2web_hierarchy": str(plot_mind2web_hierarchy(summary)),
         "workarena_service_catalog": str(plot_workarena_service_catalog(summary)),
+        "workarena_selector_sweep": str(plot_workarena_selector_sweep(summary)),
         "global_sweep": str(plot_global_sweep(summary)),
         "failure_attribution": str(plot_failure_attribution(summary)),
         "semantic_policy_sweep": str(plot_semantic_policy_sweep(summary)),
