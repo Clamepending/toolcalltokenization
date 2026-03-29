@@ -1,0 +1,272 @@
+{
+  "global_trigger_failures": {
+    "attempted_by_macro": {
+      "M001": 17,
+      "M004": 3,
+      "M006": 4,
+      "M009": 6,
+      "M010": 5
+    },
+    "failed_by_macro": {
+      "M001": 10,
+      "M009": 2
+    },
+    "failed_by_task": {
+      "choose_list": {
+        "M009": 2
+      },
+      "login_user": {
+        "M001": 7
+      },
+      "use_autocomplete": {
+        "M001": 3
+      }
+    },
+    "macro_sequences": {
+      "M001": "FILL|role=input|label=<TEXT>|use=B01 -> CLICK|role=button|label=submit",
+      "M004": "CLICK|role=listitem|label=<TEXT> -> CLICK|role=button|label=submit",
+      "M006": "FILL|role=input|label=password|use=B01 -> FILL|role=input|label=password|use=B01 -> CLICK|role=button|label=submit",
+      "M007": "FILL|role=input|label=password|use=B01 -> CLICK|role=button|label=submit",
+      "M008": "FILL|role=input|label=password|use=B01 -> FILL|role=input|label=password|use=B01",
+      "M009": "SELECT|role=select|label=<TEXT>|use=B01 -> CLICK|role=button|label=<TEXT>",
+      "M010": "CLICK|role=choice|label=<TEXT> -> FILL|role=input|label=<TEXT>|use=B01 -> CLICK|role=button|label=submit"
+    }
+  },
+  "global_trigger_sweep": [
+    {
+      "agent_decisions": 48,
+      "attempted_macro_calls": 23,
+      "browser_time_ms": 62895.785,
+      "decision_reduction_ratio": 0.4217,
+      "episodes": 32,
+      "estimated_time_saved_ms": 35790.489,
+      "failed_macro_calls": 0,
+      "label": "Global exact",
+      "macro_hits": {
+        "M001": 7,
+        "M003": 3,
+        "M006": 4,
+        "M009": 4,
+        "M010": 5
+      },
+      "macro_success_rate": 1.0,
+      "macro_total_time_ms": 110895.784,
+      "policy_mode": "oracle_exact",
+      "primitive_steps": 83,
+      "primitive_total_time_ms": 146686.273,
+      "steps_saved": 35,
+      "success_rate": 1.0,
+      "successful_macro_calls": 23
+    },
+    {
+      "agent_decisions": 48,
+      "attempted_macro_calls": 23,
+      "browser_time_ms": 62780.758,
+      "decision_reduction_ratio": 0.4217,
+      "episodes": 32,
+      "estimated_time_saved_ms": 35905.514,
+      "failed_macro_calls": 0,
+      "label": "Global 2-step",
+      "macro_hits": {
+        "M001": 7,
+        "M003": 3,
+        "M006": 4,
+        "M009": 4,
+        "M010": 5
+      },
+      "macro_success_rate": 1.0,
+      "macro_total_time_ms": 110780.759,
+      "policy_mode": "trigger_prefix",
+      "primitive_steps": 83,
+      "primitive_total_time_ms": 146686.273,
+      "steps_saved": 35,
+      "success_rate": 1.0,
+      "successful_macro_calls": 23
+    },
+    {
+      "agent_decisions": 63,
+      "attempted_macro_calls": 35,
+      "browser_time_ms": 63634.548,
+      "decision_reduction_ratio": 0.241,
+      "episodes": 32,
+      "estimated_time_saved_ms": 20051.727,
+      "failed_macro_calls": 12,
+      "label": "Global 1-step r>=0.5",
+      "macro_hits": {
+        "M001": 7,
+        "M004": 3,
+        "M006": 4,
+        "M009": 4,
+        "M010": 5
+      },
+      "macro_success_rate": 0.6571,
+      "macro_total_time_ms": 126634.546,
+      "policy_mode": "trigger_prefix",
+      "primitive_steps": 83,
+      "primitive_total_time_ms": 146686.273,
+      "steps_saved": 20,
+      "success_rate": 1.0,
+      "successful_macro_calls": 23
+    },
+    {
+      "agent_decisions": 68,
+      "attempted_macro_calls": 14,
+      "browser_time_ms": 62768.954,
+      "decision_reduction_ratio": 0.1807,
+      "episodes": 32,
+      "estimated_time_saved_ms": 15917.32,
+      "failed_macro_calls": 2,
+      "label": "Global 1-step r>=0.6",
+      "macro_hits": {
+        "M004": 3,
+        "M009": 4,
+        "M010": 5
+      },
+      "macro_success_rate": 0.8571,
+      "macro_total_time_ms": 130768.953,
+      "policy_mode": "trigger_prefix",
+      "primitive_steps": 83,
+      "primitive_total_time_ms": 146686.273,
+      "steps_saved": 15,
+      "success_rate": 1.0,
+      "successful_macro_calls": 12
+    },
+    {
+      "agent_decisions": 70,
+      "attempted_macro_calls": 8,
+      "browser_time_ms": 62820.827,
+      "decision_reduction_ratio": 0.1566,
+      "episodes": 32,
+      "estimated_time_saved_ms": 13865.446,
+      "failed_macro_calls": 0,
+      "label": "Global 1-step r=1.0",
+      "macro_hits": {
+        "M004": 3,
+        "M010": 5
+      },
+      "macro_success_rate": 1.0,
+      "macro_total_time_ms": 132820.827,
+      "policy_mode": "trigger_prefix",
+      "primitive_steps": 83,
+      "primitive_total_time_ms": 146686.273,
+      "steps_saved": 13,
+      "success_rate": 1.0,
+      "successful_macro_calls": 8
+    }
+  ],
+  "overall": {
+    "mind2web_site_task_family": {
+      "coverage_ratio": 0.1388,
+      "decision_reduction_ratio": 0.0218,
+      "groups_evaluated": 171,
+      "groups_with_macros_available": 14,
+      "macro_success_rate": 0.8571,
+      "primitive_steps": 1333,
+      "steps_saved": 29
+    },
+    "miniwob_global_exact": {
+      "agent_decisions": 48,
+      "attempted_macro_calls": 23,
+      "browser_time_ms": 62895.785,
+      "decision_reduction_ratio": 0.4217,
+      "episodes": 32,
+      "estimated_time_saved_ms": 35790.489,
+      "failed_macro_calls": 0,
+      "macro_hits": {
+        "M001": 7,
+        "M003": 3,
+        "M006": 4,
+        "M009": 4,
+        "M010": 5
+      },
+      "macro_success_rate": 1.0,
+      "macro_total_time_ms": 110895.784,
+      "policy_mode": "oracle_exact",
+      "primitive_steps": 83,
+      "primitive_total_time_ms": 146686.273,
+      "steps_saved": 35,
+      "success_rate": 1.0,
+      "successful_macro_calls": 23
+    },
+    "miniwob_global_trigger1": {
+      "agent_decisions": 63,
+      "attempted_macro_calls": 35,
+      "browser_time_ms": 63634.548,
+      "decision_reduction_ratio": 0.241,
+      "episodes": 32,
+      "estimated_time_saved_ms": 20051.727,
+      "failed_macro_calls": 12,
+      "macro_hits": {
+        "M001": 7,
+        "M004": 3,
+        "M006": 4,
+        "M009": 4,
+        "M010": 5
+      },
+      "macro_success_rate": 0.6571,
+      "macro_total_time_ms": 126634.546,
+      "policy_mode": "trigger_prefix",
+      "primitive_steps": 83,
+      "primitive_total_time_ms": 146686.273,
+      "steps_saved": 20,
+      "success_rate": 1.0,
+      "successful_macro_calls": 23
+    },
+    "miniwob_global_trigger2": {
+      "agent_decisions": 48,
+      "attempted_macro_calls": 23,
+      "browser_time_ms": 62780.758,
+      "decision_reduction_ratio": 0.4217,
+      "episodes": 32,
+      "estimated_time_saved_ms": 35905.514,
+      "failed_macro_calls": 0,
+      "macro_hits": {
+        "M001": 7,
+        "M003": 3,
+        "M006": 4,
+        "M009": 4,
+        "M010": 5
+      },
+      "macro_success_rate": 1.0,
+      "macro_total_time_ms": 110780.759,
+      "policy_mode": "trigger_prefix",
+      "primitive_steps": 83,
+      "primitive_total_time_ms": 146686.273,
+      "steps_saved": 35,
+      "success_rate": 1.0,
+      "successful_macro_calls": 23
+    },
+    "miniwob_local_oracle": {
+      "agent_decisions": 32,
+      "attempted_macro_calls": 32,
+      "browser_time_ms": 60860.62,
+      "decision_reduction_ratio": 0.6,
+      "episodes": 32,
+      "estimated_time_saved_ms": 48686.561,
+      "failed_macro_calls": 0,
+      "macro_hits": {
+        "M001": 32
+      },
+      "macro_success_rate": 1.0,
+      "macro_total_time_ms": 92860.622,
+      "policy_mode": "oracle_exact",
+      "primitive_steps": 80,
+      "primitive_total_time_ms": 141547.183,
+      "steps_saved": 48,
+      "success_rate": 1.0,
+      "successful_macro_calls": 32
+    },
+    "miniwob_stable_replay_upper_bound": {
+      "browser_time_ms": 61547.183,
+      "decision_reduction_ratio": 0.6,
+      "episodes": 32,
+      "estimated_time_saved_ms": 48000,
+      "macro_steps": 32,
+      "macro_total_time_ms": 93547.183,
+      "primitive_steps": 80,
+      "primitive_total_time_ms": 141547.183,
+      "steps_saved": 48,
+      "success_rate": 1.0
+    }
+  }
+}

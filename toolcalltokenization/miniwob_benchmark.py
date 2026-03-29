@@ -758,6 +758,9 @@ def evaluate_live_macro_policy_benchmark(
             failed_macro_calls = 0
             episode_macro_hits: Counter = Counter()
             blocked_macros_by_index: Dict[int, set[str]] = defaultdict(set)
+            attempted_macro_ids: List[str] = []
+            successful_macro_ids: List[str] = []
+            failed_macro_ids: List[str] = []
             success = False
             final_error = ""
 
@@ -774,11 +777,13 @@ def evaluate_live_macro_policy_benchmark(
                     macro_sequence = list(macro.get("sequence", []))
                     macro_id = str(macro.get("macro_id", macro.get("suggested_name", "macro")))
                     attempted_macro_calls += 1
+                    attempted_macro_ids.append(macro_id)
                     agent_decisions += 1
                     macro_failed = False
                     current_sequence = list(sequence[index : index + span])
                     if current_sequence != macro_sequence:
                         failed_macro_calls += 1
+                        failed_macro_ids.append(macro_id)
                         blocked_macros_by_index[index].add(macro_id)
                         macro_failed = True
                         bound_steps = []
@@ -795,6 +800,7 @@ def evaluate_live_macro_policy_benchmark(
                             final_error = str(obs.get("last_action_error", ""))
                             if final_error:
                                 failed_macro_calls += 1
+                                failed_macro_ids.append(macro_id)
                                 blocked_macros_by_index[index + executed_steps].add(macro_id)
                                 macro_failed = True
                                 break
@@ -809,6 +815,7 @@ def evaluate_live_macro_policy_benchmark(
                         continue
 
                     successful_macro_calls += 1
+                    successful_macro_ids.append(macro_id)
                     episode_macro_hits[macro_id] += 1
                     index += span
                     if terminated or truncated:
@@ -850,6 +857,9 @@ def evaluate_live_macro_policy_benchmark(
                     "attempted_macro_calls": attempted_macro_calls,
                     "successful_macro_calls": successful_macro_calls,
                     "failed_macro_calls": failed_macro_calls,
+                    "attempted_macro_ids": attempted_macro_ids,
+                    "successful_macro_ids": successful_macro_ids,
+                    "failed_macro_ids": failed_macro_ids,
                     "browser_time_ms": round(browser_time_ms, 3),
                     "primitive_total_time_ms": round(float(meta["browser_time_ms"]) + primitive_steps * decision_latency_ms, 3),
                     "macro_total_time_ms": round(browser_time_ms + agent_decisions * decision_latency_ms, 3),

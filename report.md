@@ -1117,6 +1117,12 @@ Representative examples:
 We now also have a dedicated live macro-policy runner:
 
 - `scripts/run_miniwob_macro_policy_benchmark.py`
+- `scripts/generate_report_figures.py`
+- figure/data bundle:
+  - `docs/data/action_chunking_summary.json`
+  - `docs/figures/action_chunking_overview.svg`
+  - `docs/figures/miniwob_global_trigger_sweep.svg`
+  - `docs/figures/miniwob_false_trigger_attribution.svg`
 
 This benchmark reruns held-out MiniWoB episodes in BrowserGym and lets a macro policy choose between promoted macros and primitive fallback.
 
@@ -1202,6 +1208,41 @@ This is the clearest live evidence so far that:
 - trigger precision matters a lot once multiple macros compete
 - primitive fallback is essential
 
+#### Figures
+
+![Overall action chunking benchmark summary](docs/figures/action_chunking_overview.svg)
+
+This figure is the current high-level result:
+
+- action chunking is weak on public Mind2Web because promoted coverage is only about `13.9%` of held-out primitive steps
+- action chunking is strong on dense repeated MiniWoB families
+- a shared action space already eats a visible fraction of the gain
+- a loose trigger eats even more of it
+
+![Global MiniWoB trigger sweep](docs/figures/miniwob_global_trigger_sweep.svg)
+
+This is the current best evidence for a project decision:
+
+- keep `2`-step triggers as the default live baseline
+- do **not** try to recover precision mainly by raising replay thresholds
+- stricter thresholds reduce false triggers, but they give back too much coverage and decision reduction
+
+![False trigger attribution under the loose global 1-step policy](docs/figures/miniwob_false_trigger_attribution.svg)
+
+This figure explains **why** the loose global trigger fails:
+
+- the false-trigger tax is highly concentrated
+- most failures come from `M001`, the over-generic `FILL(any) -> CLICK submit` macro
+- the rest come from `M009`, a generic `SELECT -> CLICK(any button)` macro
+- this means the main problem is not “macros are brittle in general”
+- the main problem is that **generic, under-conditioned macros are too easy to call in the wrong task**
+
+So the next design decision is clear:
+
+- prefer stronger context and preconditions over looser promotion
+- prefer workflow-local or state-local registries over blindly global ones
+- only expose generic macros if their trigger conditions are also much richer
+
 #### Interpretation
 
 This is the strongest result in the repo so far.
@@ -1245,6 +1286,28 @@ For MiniWoB, all three now have concrete answers:
 - yes, the upside is large in clean local settings
 - some of it survives under a global action space
 - loose triggering can burn roughly half of the remaining gain even without hurting task success
+
+#### Current decisions
+
+These are the current project decisions based on the evidence above.
+
+1. Keep `dataflow_coarse` as the main macro discovery representation.
+   It is still the best compromise between parameterization and reusable target structure.
+
+2. Treat **per-task or workflow-local** macro libraries as the optimistic setting, not the default deployment setting.
+   They are useful for measuring the upside, but they overstate how easy macro selection is.
+
+3. Treat a **shared action space with strong triggers** as the main realistic benchmark condition.
+   Right now, global MiniWoB with a `2`-step trigger is the closest thing we have to a credible online baseline.
+
+4. Prefer **better triggering** over **stricter promotion thresholds**.
+   The trigger sweep shows that replay-threshold tightening alone cannot recover the gain lost by a loose trigger.
+
+5. Keep **primitive fallback** in the loop.
+   It is the reason the loose-trigger setting still keeps task success at `1.0` despite wasted decisions.
+
+6. For the next benchmark jump, prioritize **state-aware preconditions** over more mining sophistication.
+   The main remaining loss is now selection ambiguity, not inability to discover chunks.
 
 #### BrowserGym / WorkArena blockers
 
