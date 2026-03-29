@@ -1347,6 +1347,75 @@ We now have two small evaluation scripts:
   - measures held-out exact replay precision from a trigger prefix
   - reports both overall and parameterized-macro replay precision
 
+### Mind2Web coverage sweep
+
+The main weak point in the public Mind2Web result is still **coverage**.
+
+The first site+task-family registry only covers about `13.9%` of held-out primitive steps, which is why the overall macro-agent win is only:
+
+- `1333 -> 1304` decisions
+- `29` saved decisions
+- `2.18%` decision reduction
+
+To test whether we could recover more of the upside without jumping all the way to generic global macros, we added a small hierarchy benchmark:
+
+- script: `scripts/evaluate_registry_hierarchy.py`
+- output: `outputs/mind2web_registry_hierarchy_eval.json`
+- figure: `docs/figures/mind2web_hierarchy_sweep.svg`
+
+The benchmark compares:
+
+1. `site+task-family` macros only
+2. `site` macros only
+3. `task-family` macros only
+4. `site+task-family -> site` fallback
+5. `site+task-family -> site -> task-family` fallback
+
+The most useful result is a **specificity-first hierarchy**:
+
+- keep the existing `site+task-family` registry as the first choice
+- backfill with `site` macros only when their replay precision is at least `0.7`
+
+That gives:
+
+- `1333 -> 1290` decisions
+- `43` saved decisions
+- `3.23%` decision reduction
+- coverage rises from `13.88%` to `26.63%`
+- macro success remains reasonably high at `0.80`
+
+This is a meaningful improvement over the current baseline:
+
+- exact-only baseline: `2.18%`
+- best hierarchy: `3.23%`
+- relative gain over baseline: about `48%` more saved decisions
+
+The rest of the sweep is just as informative:
+
+- `site`-only fallback is broader but too noisy
+  - `1.65%` reduction
+  - `0.6471` macro success
+- `task-family`-only macros are effectively too weak to matter here
+  - `0%` reduction in the current promoted setting
+- adding `task-family` fallback on top of the site hierarchy raises coverage more, but does **not** raise total savings
+  - `3.08%` reduction
+  - `0.7115` macro success
+
+So the current conclusion is:
+
+- broader fallback does help, but only when it is still grounded in the site
+- crossing sites by task family mostly adds ambiguity under the current representation
+- the best next coverage strategy is a **hierarchical registry**, not a fully flat global vocabulary
+
+![Mind2Web hierarchy sweep](docs/figures/mind2web_hierarchy_sweep.svg)
+
+This figure communicates the current Mind2Web design choice:
+
+- `site+task-family -> site` is the best tradeoff we have so far
+- it nearly doubles covered held-out steps
+- it improves decision reduction without sacrificing too much macro precision
+- task-family fallback is not currently worth the extra ambiguity
+
 These are still offline or replay-style measurements. The latency numbers are **decision-side estimates**, not real browser wall-clock timings.
 
 Current results for `dataflow_coarse`:

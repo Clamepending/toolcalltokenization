@@ -32,6 +32,7 @@ def percent(value: float | None) -> float | None:
 
 def build_summary() -> dict:
     mind2web = load_json(ROOT / "outputs" / "mind2web_site_task_family_macro_agent_sim.json")
+    mind2web_hierarchy = load_json(ROOT / "outputs" / "mind2web_registry_hierarchy_eval.json")
     miniwob_replay = load_json(ROOT / "outputs" / "miniwob_live_v3_stable_benchmark.json")
     miniwob_local_oracle = load_json(ROOT / "outputs" / "miniwob_live_v3_policy_oracle_v2_macro_policy_benchmark.json")
     miniwob_global_exact = load_json(ROOT / "outputs" / "miniwob_live_v3_global_oracle_macro_policy_benchmark.json")
@@ -77,12 +78,16 @@ def build_summary() -> dict:
                 "groups_with_macros_available": mind2web["summary"]["groups_with_macros_available"],
                 "groups_evaluated": mind2web["summary"]["groups_evaluated"],
             },
+            "mind2web_best_hierarchy": next(
+                item["summary"] for item in mind2web_hierarchy["variants"] if item["name"] == "exact_then_site_r07"
+            ),
             "miniwob_stable_replay_upper_bound": miniwob_replay["summary"],
             "miniwob_local_oracle": miniwob_local_oracle["summary"],
             "miniwob_global_exact": miniwob_global_exact["summary"],
             "miniwob_global_trigger2": miniwob_global_trigger2["summary"],
             "miniwob_global_trigger1": miniwob_global_trigger1["summary"],
         },
+        "mind2web_hierarchy_sweep": mind2web_hierarchy["variants"],
         "global_trigger_sweep": [
             {"label": "Global exact", **miniwob_global_exact["summary"]},
             {"label": "Global 2-step", **miniwob_global_trigger2["summary"]},
@@ -117,6 +122,7 @@ def style_matplotlib() -> None:
 def plot_overall(summary: dict) -> Path:
     scenarios = [
         ("Mind2Web\nsite+task\noffline", summary["overall"]["mind2web_site_task_family"]["decision_reduction_ratio"], "#c46b32"),
+        ("Mind2Web\nhierarchy\nbest", summary["overall"]["mind2web_best_hierarchy"]["decision_reduction_ratio"], "#bc4749"),
         ("MiniWoB\nreplay\nupper bound", summary["overall"]["miniwob_stable_replay_upper_bound"]["decision_reduction_ratio"], "#1f77b4"),
         ("MiniWoB\nlocal live\n2-step", summary["overall"]["miniwob_local_oracle"]["decision_reduction_ratio"], "#2a9d8f"),
         ("MiniWoB\nglobal live\n2-step", summary["overall"]["miniwob_global_trigger2"]["decision_reduction_ratio"], "#457b9d"),
@@ -144,8 +150,17 @@ def plot_overall(summary: dict) -> Path:
         color="#7a3e15",
     )
     ax.text(
-        3,
-        values[3] + 4.5,
+        1,
+        values[1] + 4.5,
+        "Site fallback doubles\ncovered steps",
+        ha="center",
+        va="bottom",
+        fontsize=9,
+        color="#7f1d1d",
+    )
+    ax.text(
+        4,
+        values[4] + 4.5,
         "Shared action space",
         ha="center",
         va="bottom",
@@ -153,8 +168,8 @@ def plot_overall(summary: dict) -> Path:
         color="#1d3557",
     )
     ax.text(
-        4,
-        values[4] + 4.5,
+        5,
+        values[5] + 4.5,
         "Loose trigger adds\nfalse macro calls",
         ha="center",
         va="bottom",
@@ -163,6 +178,49 @@ def plot_overall(summary: dict) -> Path:
     )
     fig.tight_layout()
     output = DOCS_FIGURES / "action_chunking_overview.svg"
+    fig.savefig(output, bbox_inches="tight")
+    plt.close(fig)
+    return output
+
+
+def plot_mind2web_hierarchy(summary: dict) -> Path:
+    variants = summary["mind2web_hierarchy_sweep"]
+    labels = {
+        "exact_only": "Site+task only",
+        "site_only": "Site only",
+        "family_only": "Family only",
+        "exact_then_site_r05": "Site+task -> site (r>=0.5)",
+        "exact_then_site_r07": "Site+task -> site (r>=0.7)",
+        "exact_then_site_then_family_r05": "Site+task -> site -> family",
+    }
+    ordered = [item for item in variants if item["name"] in labels]
+    names = [labels[item["name"]] for item in ordered]
+    reductions = [percent(item["summary"]["decision_reduction_ratio"]) for item in ordered]
+    coverage = [percent(item["summary"]["coverage_ratio"]) for item in ordered]
+    macro_success = [percent(item["summary"]["macro_success_rate"]) for item in ordered]
+
+    fig, axes = plt.subplots(2, 1, figsize=(10.5, 7.4), sharex=True, gridspec_kw={"height_ratios": [2, 1.6]})
+    bars = axes[0].bar(names, reductions, color=["#bc6c25", "#dda15e", "#e9c46a", "#c1121f", "#9a031e", "#6d597a"])
+    axes[0].set_ylabel("Decision Reduction (%)")
+    axes[0].set_title("Mind2Web Coverage Improves with Site Fallback, but Family Fallback Mostly Adds Noise")
+    axes[0].grid(axis="y", alpha=0.25)
+    axes[0].set_ylim(0, max(reductions) * 1.35 if reductions else 1)
+    for bar, value in zip(bars, reductions):
+        axes[0].text(bar.get_x() + bar.get_width() / 2, value + 0.12, f"{value:.2f}%", ha="center", va="bottom", fontsize=9)
+
+    axes[1].bar(names, coverage, color="#8ecae6", alpha=0.85, label="Covered held-out steps")
+    axes[1].set_ylabel("Coverage (%)")
+    axes[1].grid(axis="y", alpha=0.25)
+    twin = axes[1].twinx()
+    twin.plot(names, macro_success, color="#264653", marker="o", linewidth=2, label="Macro success rate")
+    twin.set_ylabel("Macro Success (%)")
+    twin.set_ylim(0, 110)
+    for idx, value in enumerate(macro_success):
+        twin.text(idx, value + 3, f"{value:.1f}%", ha="center", va="bottom", color="#264653", fontsize=8)
+
+    axes[1].tick_params(axis="x", rotation=18)
+    fig.tight_layout()
+    output = DOCS_FIGURES / "mind2web_hierarchy_sweep.svg"
     fig.savefig(output, bbox_inches="tight")
     plt.close(fig)
     return output
@@ -252,6 +310,7 @@ def main() -> None:
     dump_json(str(DOCS_DATA / "action_chunking_summary.json"), summary)
     outputs = {
         "overview": str(plot_overall(summary)),
+        "mind2web_hierarchy": str(plot_mind2web_hierarchy(summary)),
         "global_sweep": str(plot_global_sweep(summary)),
         "failure_attribution": str(plot_failure_attribution(summary)),
     }

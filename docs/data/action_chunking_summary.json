@@ -154,7 +154,118 @@
       "successful_macro_calls": 8
     }
   ],
+  "mind2web_hierarchy_sweep": [
+    {
+      "name": "exact_only",
+      "summary": {
+        "agent_decisions": 1304,
+        "attempted_macro_calls": 21,
+        "coverage_ratio": 0.1388,
+        "decision_reduction_ratio": 0.0218,
+        "failed_macro_calls": 3,
+        "groups_evaluated": 171,
+        "groups_with_macros_available": 14,
+        "macro_success_rate": 0.8571,
+        "primitive_steps": 1333,
+        "steps_saved": 29,
+        "successful_macro_calls": 18
+      }
+    },
+    {
+      "name": "site_only",
+      "summary": {
+        "agent_decisions": 1311,
+        "attempted_macro_calls": 34,
+        "coverage_ratio": 0.2213,
+        "decision_reduction_ratio": 0.0165,
+        "failed_macro_calls": 12,
+        "groups_evaluated": 171,
+        "groups_with_macros_available": 55,
+        "macro_success_rate": 0.6471,
+        "primitive_steps": 1333,
+        "steps_saved": 22,
+        "successful_macro_calls": 22
+      }
+    },
+    {
+      "name": "family_only",
+      "summary": {
+        "agent_decisions": 1333,
+        "attempted_macro_calls": 0,
+        "coverage_ratio": 0.0,
+        "decision_reduction_ratio": 0.0,
+        "failed_macro_calls": 0,
+        "groups_evaluated": 171,
+        "groups_with_macros_available": 0,
+        "macro_success_rate": 0.0,
+        "primitive_steps": 1333,
+        "steps_saved": 0,
+        "successful_macro_calls": 0
+      }
+    },
+    {
+      "name": "exact_then_site_r05",
+      "summary": {
+        "agent_decisions": 1292,
+        "attempted_macro_calls": 42,
+        "coverage_ratio": 0.2723,
+        "decision_reduction_ratio": 0.0308,
+        "failed_macro_calls": 10,
+        "groups_evaluated": 171,
+        "groups_with_macros_available": 59,
+        "macro_success_rate": 0.7619,
+        "primitive_steps": 1333,
+        "steps_saved": 41,
+        "successful_macro_calls": 32
+      }
+    },
+    {
+      "name": "exact_then_site_r07",
+      "summary": {
+        "agent_decisions": 1290,
+        "attempted_macro_calls": 40,
+        "coverage_ratio": 0.2663,
+        "decision_reduction_ratio": 0.0323,
+        "failed_macro_calls": 8,
+        "groups_evaluated": 171,
+        "groups_with_macros_available": 50,
+        "macro_success_rate": 0.8,
+        "primitive_steps": 1333,
+        "steps_saved": 43,
+        "successful_macro_calls": 32
+      }
+    },
+    {
+      "name": "exact_then_site_then_family_r05",
+      "summary": {
+        "agent_decisions": 1292,
+        "attempted_macro_calls": 52,
+        "coverage_ratio": 0.3376,
+        "decision_reduction_ratio": 0.0308,
+        "failed_macro_calls": 15,
+        "groups_evaluated": 171,
+        "groups_with_macros_available": 74,
+        "macro_success_rate": 0.7115,
+        "primitive_steps": 1333,
+        "steps_saved": 41,
+        "successful_macro_calls": 37
+      }
+    }
+  ],
   "overall": {
+    "mind2web_best_hierarchy": {
+      "agent_decisions": 1290,
+      "attempted_macro_calls": 40,
+      "coverage_ratio": 0.2663,
+      "decision_reduction_ratio": 0.0323,
+      "failed_macro_calls": 8,
+      "groups_evaluated": 171,
+      "groups_with_macros_available": 50,
+      "macro_success_rate": 0.8,
+      "primitive_steps": 1333,
+      "steps_saved": 43,
+      "successful_macro_calls": 32
+    },
     "mind2web_site_task_family": {
       "coverage_ratio": 0.1388,
       "decision_reduction_ratio": 0.0218,
