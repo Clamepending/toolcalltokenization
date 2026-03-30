@@ -2982,3 +2982,125 @@ Those are good next steps, but the repo should first prove that the trace format
 4. Add a typed-slot macro miner beyond simple frequent n-grams.
 5. Add hybrid macro execution inside a controlled browser agent.
 6. Measure online success / speed / cost on WorkArena-L1.
+
+## OttoAuth Real-Agent Collection
+
+We now have a direct path from the production-style OttoAuth browser agent into this macro-mining repo.
+
+### What is implemented
+
+Two new pieces are now in place:
+
+1. `ottoauth` trace conversion
+   - `convert_ottoauth_traces(...)` ingests the saved `task.json` and `trace.json` folders from the Chrome extension recorder.
+   - Each recorded `tool_use` becomes one trace row.
+   - This is closer to the original research objective than Mind2Web, because the sequence is the agent's actual tool-call trace rather than a post-hoc browser annotation.
+
+2. Real-agent collection helpers
+   - `scripts/ingest_ottoauth_collection.py` converts `data/ottoauth/` into:
+     - `raw_trace.jsonl`
+     - `canonical_trace.jsonl`
+     - `summary.json`
+   - `scripts/queue_ottoauth_campaign.mjs` enqueues reproducible task batches directly into OttoAuth's task queue and writes a manifest so the exact prompts are preserved.
+
+### Current local OttoAuth data
+
+The current on-disk sample is still very small:
+
+- `3` local episodes
+- `16` tool-call events
+- all from `amazon.com`
+
+The converted summary is in:
+
+- `outputs/ottoauth_live_collection/summary.json`
+- `outputs/ottoauth_live_collection/canonical_trace.jsonl`
+
+Current episode lengths:
+
+- `2`
+- `2`
+- `12`
+
+Top tool calls so far:
+
+- `computer_screenshot`: `4`
+- `navigate`: `3`
+- `read_page`: `2`
+- `find`: `2`
+- `form_input`: `1`
+
+### What the first real-agent trace looks like
+
+The successful Amazon search trace currently looks like:
+
+`screenshot -> navigate -> read_page -> find -> form_input -> key -> wait -> read_page -> find -> screenshot -> left_click -> scroll`
+
+In `dataflow_coarse`, that becomes:
+
+`COMPUTER|role=screenshot -> NAVIGATE|use=B01 -> READ_PAGE -> FIND|use=B02 -> FORM_INPUT|use=B03 -> COMPUTER|role=key|use=B04 -> COMPUTER|role=wait -> READ_PAGE -> FIND|use=B05 -> COMPUTER|role=screenshot -> COMPUTER|role=left_click -> COMPUTER|role=scroll`
+
+This is a useful confirmation that the production agent emits structured enough traces for macro mining. The trace is not just raw browser clicks; it already contains semantically meaningful tool calls like `find`, `read_page`, and `form_input`.
+
+### Current result from those local traces
+
+With only these three local episodes, the miner finds no nontrivial promoted macro.
+
+That is actually the expected result:
+
+- two early Amazon checkout traces died after only `screenshot -> navigate`
+- one Amazon search trace continues much further
+- there is not yet enough repeated same-workflow support for anything beyond a trivial prefix
+- the only repeated chunk with support `>= 2` is `COMPUTER|role=screenshot -> NAVIGATE|use=B01` with support `3`
+
+So the current OttoAuth result is not a negative result for action chunking. It is a clean confirmation that:
+
+1. the ingest path works
+2. the production agent traces are structurally usable
+3. the current limiting factor is **data density**, not representational mismatch
+
+### Important data collection insight
+
+The OttoAuth server shows more completed local-agent tasks than are currently present under `data/ottoauth/`.
+
+That means the current bottleneck for this collection path is:
+
+- not task execution
+- not queueing
+- not the converter
+- but **recorder consistency / deployment freshness**
+
+The current audit is now explicit:
+
+- local recorded task count: `3`
+- server completed task count: `6`
+- server failed task count: `2`
+- missing completed local recordings: `5`
+- missing failed local recordings: `2`
+
+The audit artifact is:
+
+- `outputs/ottoauth_collection_audit.json`
+
+In practice, this means the next high-value move for real-agent data collection is:
+
+1. refresh the extension to the newest build
+2. run dense repeated batches like `amazon_search` or `newegg_search`
+3. re-run `scripts/ingest_ottoauth_collection.py`
+4. start plotting episodes-vs-compression directly on the production agent traces
+
+### Research interpretation
+
+This new path sharpens the overall story:
+
+- benchmark traces proved the method can work
+- dense benchmark families showed strong savings
+- real-agent OttoAuth traces now prove that the production tool-call layer is compatible with the same macro-mining pipeline
+
+So the remaining question is no longer "can this pipeline ingest a real browser agent?" The answer to that is yes.
+
+The remaining question is now purely empirical:
+
+**How many repeated episodes per site-family are needed before the production agent's own tool vocabulary starts to compress in a meaningful way?**
+
+The current repo is now set up to answer that once we accumulate more OttoAuth traces.

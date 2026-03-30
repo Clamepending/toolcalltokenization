@@ -5,3 +5,4 @@ __pycache__/
 .venvbg/
 outputs/
 data/local/
+data/ottoauth/

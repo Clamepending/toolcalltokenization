@@ -5,6 +5,7 @@ from typing import Iterable, List, Optional
 import gzip
 import json
 import re
+from urllib.parse import urlsplit
 
 
 LABEL_ATTR_KEYS = (
@@ -370,6 +371,170 @@ def convert_wonderbread_trace(input_path: str) -> List[dict]:
                     "element": element,
                     "state_step": last_state.get("step"),
                     "source_file": str(json_path),
+                }
+            )
+            step_index += 1
+    return events
+
+
+def iter_ottoauth_trace_dirs(path: str) -> List[Path]:
+    root = Path(path)
+    if root.is_file():
+        if root.name != "trace.json":
+            return []
+        return [root.parent] if (root.parent / "task.json").is_file() else []
+    trace_dirs = []
+    for candidate in sorted(root.rglob("trace.json")):
+        if (candidate.parent / "task.json").is_file():
+            trace_dirs.append(candidate.parent)
+    return trace_dirs
+
+
+def hostname_from_text(value: object) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    direct = re.search(r"https?://[^\s)\"']+", text, re.IGNORECASE)
+    candidate = direct.group(0) if direct else text
+    try:
+        return urlsplit(candidate).hostname or ""
+    except ValueError:
+        return ""
+
+
+def infer_ottoauth_website(task_payload: dict, trace_payload: dict, trace_dir: Path) -> str:
+    task = task_payload.get("task", {}) if isinstance(task_payload.get("task"), dict) else {}
+    candidates = [
+        task.get("url"),
+        trace_payload.get("url"),
+        task.get("goal"),
+        task.get("taskPrompt"),
+        task_payload.get("goal"),
+    ]
+    for candidate in candidates:
+        hostname = hostname_from_text(candidate)
+        if hostname:
+            return hostname.replace("www.", "")
+    site_dir = trace_dir.parent.name
+    return site_dir if site_dir and site_dir != "unknown-site" else "<missing>"
+
+
+def infer_ottoauth_task_text(task_payload: dict) -> str:
+    task = task_payload.get("task", {}) if isinstance(task_payload.get("task"), dict) else {}
+    for value in (
+        task.get("taskPrompt"),
+        task.get("goal"),
+        task_payload.get("goal"),
+    ):
+        text = str(value or "").strip()
+        if text:
+            return text
+    return ""
+
+
+def tool_call_name(tool_name: str, tool_input: dict) -> str:
+    name = str(tool_name or "").strip().lower() or "unknown"
+    if name == "computer":
+        action = str(tool_input.get("action") or "").strip().lower()
+        if action:
+            return f"computer_{action}"
+    return name
+
+
+def tool_value_fields(tool_name: str, tool_input: dict) -> dict:
+    if tool_name == "navigate":
+        return {
+            "url": tool_input.get("url"),
+            "value": tool_input.get("url"),
+        }
+    if tool_name == "find":
+        return {
+            "value": tool_input.get("query"),
+            "query": tool_input.get("query"),
+        }
+    if tool_name == "form_input":
+        return {
+            "value": tool_input.get("value"),
+            "selector": tool_input.get("ref"),
+        }
+    if tool_name == "get_page_text":
+        return {
+            "value": tool_input.get("max_chars"),
+        }
+    if tool_name == "read_page":
+        return {
+            "selector": tool_input.get("ref_id"),
+        }
+    if tool_name == "computer":
+        return {
+            "value": tool_input.get("text"),
+            "selector": tool_input.get("ref"),
+            "target_role": tool_input.get("action"),
+        }
+    return {
+        "value": tool_input.get("value") or tool_input.get("text"),
+        "selector": tool_input.get("ref") or tool_input.get("selector"),
+    }
+
+
+def convert_ottoauth_traces(input_path: str) -> List[dict]:
+    events: List[dict] = []
+    for trace_dir in iter_ottoauth_trace_dirs(input_path):
+        task_payload = load_json(str(trace_dir / "task.json"))
+        trace_payload = load_json(str(trace_dir / "trace.json"))
+        if not isinstance(task_payload, dict) or not isinstance(trace_payload, dict):
+            continue
+
+        task = task_payload.get("task", {}) if isinstance(task_payload.get("task"), dict) else {}
+        episode_id = str(trace_payload.get("taskId") or task.get("id") or trace_dir.name)
+        website = infer_ottoauth_website(task_payload, trace_payload, trace_dir)
+        task_text = infer_ottoauth_task_text(task_payload)
+        result_by_tool_use_id = {}
+        for event in trace_payload.get("events", []) or []:
+            if not isinstance(event, dict) or event.get("type") != "tool_result":
+                continue
+            payload = event.get("payload", {}) or {}
+            tool_use_id = str(payload.get("toolUseId") or "").strip()
+            if tool_use_id:
+                result_by_tool_use_id[tool_use_id] = payload
+
+        step_index = 0
+        for event in trace_payload.get("events", []) or []:
+            if not isinstance(event, dict) or event.get("type") != "tool_use":
+                continue
+            payload = event.get("payload", {}) or {}
+            tool_name = str(payload.get("name") or "").strip().lower()
+            tool_input = payload.get("input", {}) or {}
+            if not tool_name or not isinstance(tool_input, dict):
+                continue
+            tool_use_id = str(payload.get("toolUseId") or "").strip()
+            result_payload = result_by_tool_use_id.get(tool_use_id, {})
+            value_fields = tool_value_fields(tool_name, tool_input)
+            events.append(
+                {
+                    "source_dataset": "ottoauth",
+                    "episode_id": episode_id,
+                    "task_id": episode_id,
+                    "step_index": step_index,
+                    "benchmark": "ottoauth_local_agent",
+                    "website": website,
+                    "task": task_text,
+                    "task_status": trace_payload.get("status"),
+                    "action_type": tool_call_name(tool_name, tool_input),
+                    "tool_name": tool_name,
+                    "tool_use_id": tool_use_id,
+                    "url": value_fields.get("url") or trace_payload.get("url") or task.get("url"),
+                    "value": value_fields.get("value"),
+                    "query": value_fields.get("query"),
+                    "selector": value_fields.get("selector"),
+                    "target_role": value_fields.get("target_role"),
+                    "target_label": "",
+                    "result_text": result_payload.get("text"),
+                    "result_image_count": result_payload.get("imageCount"),
+                    "duration_ms": result_payload.get("durationMs"),
+                    "raw_input": tool_input,
+                    "raw_result": result_payload,
+                    "source_file": str(trace_dir / "trace.json"),
                 }
             )
             step_index += 1

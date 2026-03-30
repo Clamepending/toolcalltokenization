@@ -237,6 +237,7 @@ Current best public-data finding:
 Current converters target:
 
 - Mind2Web task JSON files
+- OttoAuth local-agent `task.json` / `trace.json` recording folders
 - WebLINX `replay.json` demonstrations
 - WebLINX processed chat/action JSONL or JSONL.GZ files
 - WONDERBREAD-style `trace.json` files
@@ -244,3 +245,51 @@ Current converters target:
 ## Local public data
 
 See [data/README.md](./data/README.md) for the small public dataset slices currently used by the repo.
+
+## OttoAuth Collection
+
+The repo now includes a direct ingest path for real browser-agent traces recorded by the OttoAuth Chrome extension.
+
+Convert the saved recordings into raw + canonical JSONL plus a summary:
+
+```bash
+python3 scripts/ingest_ottoauth_collection.py \
+  --input data/ottoauth \
+  --output-dir outputs/ottoauth_live_collection
+```
+
+This writes:
+
+- `outputs/ottoauth_live_collection/raw_trace.jsonl`
+- `outputs/ottoauth_live_collection/canonical_trace.jsonl`
+- `outputs/ottoauth_live_collection/summary.json`
+
+To enqueue reproducible site-family batches for the polling OttoAuth browser agent:
+
+```bash
+/opt/homebrew/bin/node scripts/queue_ottoauth_campaign.mjs \
+  --campaign amazon_search \
+  --count 6
+```
+
+Current built-in campaigns are:
+
+- `amazon_search`
+- `newegg_search`
+- `wikipedia_search`
+- `mixed_search`
+
+Each queued batch also writes a manifest under `outputs/ottoauth_campaign_manifests/` so the exact prompts used for collection are preserved.
+
+To compare what reached the OttoAuth server versus what actually landed in `data/ottoauth/`:
+
+```bash
+/opt/homebrew/bin/node scripts/audit_ottoauth_collection.mjs
+```
+
+Current real-agent collection status:
+
+- the ingest path works on the traces already saved under `data/ottoauth`
+- the current on-disk sample is still tiny and dominated by Amazon traces
+- with only three local episodes, no nontrivial macro survives mining yet
+- the current bottleneck for this path is collection density and recorder consistency, not the ingest or mining code

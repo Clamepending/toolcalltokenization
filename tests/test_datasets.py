@@ -5,6 +5,7 @@ from pathlib import Path
 
 from toolcalltokenization.datasets import (
     convert_mind2web,
+    convert_ottoauth_traces,
     convert_weblinx_chat,
     convert_weblinx_replay,
     convert_wonderbread_trace,
@@ -135,6 +136,75 @@ class DatasetConvertersTest(unittest.TestCase):
         self.assertEqual(rows[1]["selector"], "abc")
         self.assertEqual(rows[1]["target_role"], "input")
         self.assertEqual(rows[1]["target_label"], "Email")
+
+    def test_convert_ottoauth_traces(self) -> None:
+        task_payload = {
+            "schemaVersion": 1,
+            "goal": "Go to https://www.amazon.com/ and search for MX Master 3S.",
+            "sessionId": "session_1",
+            "serverUrl": "http://localhost:3000",
+            "deviceId": "browser-agent-1",
+            "task": {
+                "id": "mock_1",
+                "type": "start_local_agent_goal",
+                "url": None,
+                "goal": "Go to https://www.amazon.com/ and search for MX Master 3S.",
+                "taskPrompt": "Go to https://www.amazon.com/ and search for MX Master 3S.",
+                "deviceId": "browser-agent-1",
+                "createdAt": "2026-03-30T00:00:00Z",
+            },
+        }
+        trace_payload = {
+            "schemaVersion": 1,
+            "taskId": "mock_1",
+            "taskType": "start_local_agent_goal",
+            "status": "completed",
+            "events": [
+                {
+                    "timestamp": 1,
+                    "type": "tool_use",
+                    "payload": {
+                        "toolUseId": "tool_1",
+                        "name": "navigate",
+                        "input": {"url": "https://www.amazon.com/", "tabId": 5},
+                    },
+                },
+                {
+                    "timestamp": 2,
+                    "type": "tool_result",
+                    "payload": {
+                        "toolUseId": "tool_1",
+                        "name": "navigate",
+                        "durationMs": 123,
+                        "text": "",
+                        "imageCount": 1,
+                    },
+                },
+                {
+                    "timestamp": 3,
+                    "type": "tool_use",
+                    "payload": {
+                        "toolUseId": "tool_2",
+                        "name": "find",
+                        "input": {"query": "search box", "tabId": 5},
+                    },
+                },
+            ],
+        }
+        with tempfile.TemporaryDirectory() as temp_dir:
+            run_dir = Path(temp_dir) / "2026-03-30" / "amazon.com" / "run_1"
+            run_dir.mkdir(parents=True)
+            (run_dir / "task.json").write_text(json.dumps(task_payload), encoding="utf-8")
+            (run_dir / "trace.json").write_text(json.dumps(trace_payload), encoding="utf-8")
+            rows = convert_ottoauth_traces(temp_dir)
+
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(rows[0]["episode_id"], "mock_1")
+        self.assertEqual(rows[0]["website"], "amazon.com")
+        self.assertEqual(rows[0]["action_type"], "navigate")
+        self.assertEqual(rows[0]["duration_ms"], 123)
+        self.assertEqual(rows[1]["action_type"], "find")
+        self.assertEqual(rows[1]["query"], "search box")
 
 
 if __name__ == "__main__":

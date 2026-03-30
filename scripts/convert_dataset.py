@@ -12,6 +12,7 @@ if str(ROOT) not in sys.path:
 
 from toolcalltokenization.datasets import (
     convert_mind2web,
+    convert_ottoauth_traces,
     convert_weblinx_chat,
     convert_weblinx_replay,
     convert_wonderbread_trace,
@@ -21,7 +22,11 @@ from toolcalltokenization.datasets import (
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Convert external browser-trace datasets into the repo JSONL trace format.")
-    parser.add_argument("--source", choices=("mind2web", "weblinx", "weblinx_chat", "wonderbread"), required=True)
+    parser.add_argument(
+        "--source",
+        choices=("mind2web", "ottoauth", "weblinx", "weblinx_chat", "wonderbread"),
+        required=True,
+    )
     parser.add_argument("--input", required=True, help="Path to dataset file or root directory.")
     parser.add_argument("--output", required=True, help="Path to JSONL output file.")
     parser.add_argument("--include-chat", action="store_true", help="Include WebLINX chat turns as SAY actions.")
@@ -32,6 +37,8 @@ def main() -> None:
     args = parse_args()
     if args.source == "mind2web":
         rows = convert_mind2web(args.input)
+    elif args.source == "ottoauth":
+        rows = convert_ottoauth_traces(args.input)
     elif args.source == "weblinx":
         rows = convert_weblinx_replay(args.input, include_chat=args.include_chat)
     elif args.source == "weblinx_chat":
