@@ -3391,3 +3391,49 @@ These changes are in the extension code, not the macro-mining repo:
 - `chrome-extension/src/shared/constants.ts`
 
 This does **not** yet prove that the underlying hang is fully fixed. It does ensure that future collection runs will be cheaper to monitor and less likely to wedge silently.
+
+### Recording Validation After Refresh
+
+After re-enabling trace recording and refreshing the extension, I ran a fresh single-task Amazon validation probe:
+
+- task: `amazon_search`
+- result: local trace folder created immediately
+- status: `completed`
+- final result recorded correctly
+- running trace included heartbeat events before completion
+
+That confirms the refreshed build restored the core collection loop:
+
+- task was claimed
+- local recording started immediately
+- progress was persisted during the run
+- final trace was written on completion
+
+So the current state is better than before. The main failure mode is no longer “task completed but no local trace exists.”
+
+### New Reliability Limit: Mid-Tool Hangs
+
+The next two Amazon search tasks revealed a more specific runtime issue:
+
+- one task progressed normally into a live local trace
+- it continued to emit heartbeat events
+- but it became stuck after issuing a `computer.scroll` action on the Amazon results page
+- the trace shows `tool_use` for scroll, but no matching `tool_result`
+
+This is a much better failure mode diagnostically, because we can now tell that:
+
+- the task is not stalled before trace creation
+- the task is not stalled before model output
+- the hang is happening inside a particular browser tool call
+
+To contain that class of problem, I added a per-tool timeout in the extension runtime:
+
+- `OTTOAUTH_TOOL_TIMEOUT_MS = 45000`
+- timed-out tool calls now surface as tool errors instead of hanging forever
+
+That change is in:
+
+- `chrome-extension/src/sidepanel/agent/loop.ts`
+- `chrome-extension/src/shared/constants.ts`
+
+This latest timeout hardening requires another extension refresh before it affects live collection.
