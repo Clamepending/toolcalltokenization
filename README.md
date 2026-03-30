@@ -281,7 +281,82 @@ See [data/README.md](./data/README.md) for the small public dataset slices curre
 
 The repo now includes a direct ingest path for real browser-agent traces recorded by the OttoAuth Chrome extension.
 
-Convert the saved recordings into raw + canonical JSONL plus a summary:
+### Collect data with the OttoAuth extension
+
+The OttoAuth app and extension live in the sibling repo:
+
+- app/server: `/Users/mark/Desktop/projects/oneclickstack/autoauth`
+- Chrome extension: `/Users/mark/Desktop/projects/oneclickstack/autoauth/chrome-extension`
+
+Minimal collection flow:
+
+1. Start the OttoAuth app server:
+
+```bash
+cd /Users/mark/Desktop/projects/oneclickstack/autoauth
+npm run dev
+```
+
+2. Build the extension:
+
+```bash
+cd /Users/mark/Desktop/projects/oneclickstack/autoauth/chrome-extension
+npm run build
+```
+
+3. In Chrome, load or refresh the unpacked extension from:
+
+```text
+/Users/mark/Desktop/projects/oneclickstack/autoauth/chrome-extension/dist
+```
+
+4. Open the extension sidepanel and configure OttoAuth:
+   - server URL: `http://localhost:3000`
+   - device name: usually `browser-agent-1`
+   - click `Connect & Pair`
+
+5. Turn on trace recording in the OttoAuth section:
+   - click `Select Folder`
+   - choose:
+
+```text
+/Users/mark/Desktop/projects/toolcalltokenization/data/ottoauth
+```
+
+   - click `Start Recording` if needed
+   - then click `Start Polling`
+
+6. Queue a small campaign from this repo:
+
+```bash
+/opt/homebrew/bin/node scripts/queue_ottoauth_campaign.mjs \
+  --campaign amazon_search \
+  --count 6
+```
+
+Current built-in campaigns are:
+
+- `amazon_search`
+- `amazon_cart`
+- `amazon_checkout_preview`
+- `newegg_search`
+- `wikipedia_search`
+- `mixed_search`
+
+7. Let the browser agent finish the queued tasks.
+
+Each completed task writes a folder like:
+
+```text
+data/ottoauth/YYYY-MM-DD/<site>/<timestamp>_<site>_<task-type>_<task-id>/
+```
+
+with:
+
+- `task.json`
+- `trace.json`
+
+8. Ingest the saved traces into the macro-mining format:
 
 ```bash
 python3 scripts/ingest_ottoauth_collection.py \
@@ -295,6 +370,40 @@ This writes:
 - `outputs/ottoauth_live_collection/canonical_trace.jsonl`
 - `outputs/ottoauth_live_collection/summary.json`
 
+9. Run the Amazon study:
+
+```bash
+python3 scripts/run_ottoauth_amazon_study.py \
+  --input outputs/ottoauth_live_collection/canonical_trace.jsonl \
+  --output outputs/ottoauth_amazon_study.json
+
+python3 scripts/generate_ottoauth_amazon_figures.py \
+  --input outputs/ottoauth_amazon_study.json \
+  --output docs/figures/ottoauth_amazon_learning_curves.svg
+```
+
+Useful checks while collecting:
+
+- compare server-side task completions to local trace folders:
+
+```bash
+/opt/homebrew/bin/node scripts/audit_ottoauth_collection.mjs
+```
+
+- refresh the local ingest + Amazon study + health dashboard:
+
+```bash
+python3 scripts/refresh_ottoauth_dashboard.py
+```
+
+Convert the saved recordings into raw + canonical JSONL plus a summary:
+
+```bash
+python3 scripts/ingest_ottoauth_collection.py \
+  --input data/ottoauth \
+  --output-dir outputs/ottoauth_live_collection
+```
+
 To enqueue reproducible site-family batches for the polling OttoAuth browser agent:
 
 ```bash
@@ -306,6 +415,8 @@ To enqueue reproducible site-family batches for the polling OttoAuth browser age
 Current built-in campaigns are:
 
 - `amazon_search`
+- `amazon_cart`
+- `amazon_checkout_preview`
 - `newegg_search`
 - `wikipedia_search`
 - `mixed_search`
@@ -338,21 +449,13 @@ Published dataset:
 
 - [clamepending/ottoauth-local-agent-snapshot](https://huggingface.co/datasets/clamepending/ottoauth-local-agent-snapshot)
 
-This writes:
-
-- `hf_datasets/ottoauth_local_agent_snapshot/raw_traces/`
-- `hf_datasets/ottoauth_local_agent_snapshot/processed/`
-- `hf_datasets/ottoauth_local_agent_snapshot/manifests/`
-- `hf_datasets/ottoauth_local_agent_snapshot/analysis/`
-- `hf_datasets/ottoauth_local_agent_snapshot/figures/`
-- `hf_datasets/ottoauth_local_agent_snapshot/metadata/export_summary.json`
-
-The snapshot includes:
+The current published snapshot is intentionally small. It includes:
 
 - sanitized raw `task.json` / `trace.json` folders
-- sanitized processed JSONL (`raw_trace.jsonl`, `canonical_trace.jsonl`)
+- `processed/canonical_trace.jsonl`
 - queued campaign manifests
-- the current Amazon study and collection-health artifacts
+- the current Amazon study JSON and figure
+- export metadata
 
 To re-run the Amazon study from the snapshot:
 
