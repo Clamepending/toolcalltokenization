@@ -1,0 +1,125 @@
+{
+  "device_id": "browser-agent-1",
+  "traces_root": "<LOCAL_ROOT>/data/ottoauth",
+  "local_recorded_task_count": 19,
+  "server_completed_task_count": 28,
+  "server_failed_task_count": 7,
+  "missing_completed_recordings": [
+    {
+      "id": "mock_1774863995509_1kxvij",
+      "created_at": "2026-03-30T09:46:35.508Z",
+      "updated_at": "2026-03-30T09:47:34.810Z",
+      "task_prompt": "Go to https://www.amazon.com/, search for Logitech MX Master 3S, open the first plausible product result without purchasing anything, and report exactly this JSON: {\"status\":\"success\",\"product_title\":\"<title>\",\"price_text\":\"<displayed price or unknown>\"}"
+    },
+    {
+      "id": "mock_1774863995509_wmcfhz",
+      "created_at": "2026-03-30T09:46:35.508Z",
+      "updated_at": "2026-03-30T09:49:48.865Z",
+      "task_prompt": "Go to https://www.amazon.com/, search for black crew socks men, open a plausible first product result, add the item to cart if possible, stop before checkout, and report exactly this JSON: {\"status\":\"success\",\"product_title\":\"<title>\",\"added_to_cart\":true,\"cart_signal\":\"<evidence or unknown>\"}. If you cannot add it, return {\"status\":\"error\",\"error\":\"<what went wrong>\"}."
+    },
+    {
+      "id": "mock_1774860840784_j5fpef",
+      "created_at": "2026-03-30T08:54:00.783Z",
+      "updated_at": "2026-03-30T08:55:38.463Z",
+      "task_prompt": "Go to https://www.amazon.com/, search for Logitech MX Master 3S, open the first plausible product result without purchasing anything, and report exactly this JSON: {\"status\":\"success\",\"product_title\":\"<title>\",\"price_text\":\"<displayed price or unknown>\"}"
+    },
+    {
+      "id": "mock_1774858331389_1khzix",
+      "created_at": "2026-03-30T08:12:11.388Z",
+      "updated_at": "2026-03-30T08:13:36.588Z",
+      "task_prompt": "Go to https://www.amazon.com/, search for Logitech MX Master 3S, open the first plausible product result without purchasing anything, and report exactly this JSON: {\"status\":\"success\",\"product_title\":\"<title>\",\"price_text\":\"<displayed price or unknown>\"}"
+    },
+    {
+      "id": "mock_1774850129616_3ackhf",
+      "created_at": "2026-03-30T05:55:29.615Z",
+      "updated_at": "2026-03-30T05:57:56.849Z",
+      "task_prompt": "Go to https://www.amazon.com/, search for black crew socks men, open a plausible first product result, add the item to cart if possible, stop before checkout, and report exactly this JSON: {\"status\":\"success\",\"product_title\":\"<title>\",\"added_to_cart\":true,\"cart_signal\":\"<evidence or unknown>\"}. If you cannot add it, return {\"status\":\"error\",\"error\":\"<what went wrong>\"}."
+    },
+    {
+      "id": "mock_1774850129616_8rtfja",
+      "created_at": "2026-03-30T05:55:29.615Z",
+      "updated_at": "2026-03-30T05:58:55.364Z",
+      "task_prompt": "Go to https://www.amazon.com/, search for Logitech MX Master 3S, open the first plausible product result without purchasing anything, and report exactly this JSON: {\"status\":\"success\",\"product_title\":\"<title>\",\"price_text\":\"<displayed price or unknown>\"}"
+    },
+    {
+      "id": "mock_1774850129937_zg5wbc",
+      "created_at": "2026-03-30T05:55:29.615Z",
+      "updated_at": "2026-03-30T06:04:33.794Z",
+      "task_prompt": "Go to https://www.amazon.com/, search for white ankle socks women, open a plausible first product result, add the item to cart if possible, stop before checkout, and report exactly this JSON: {\"status\":\"success\",\"product_title\":\"<title>\",\"added_to_cart\":true,\"cart_signal\":\"<evidence or unknown>\"}. If you cannot add it, return {\"status\":\"error\",\"error\":\"<what went wrong>\"}."
+    },
+    {
+      "id": "mock_1774850130003_oc9rcz",
+      "created_at": "2026-03-30T05:55:29.615Z",
+      "updated_at": "2026-03-30T06:04:41.224Z",
+      "task_prompt": "Go to https://www.amazon.com/, search for Apple AirPods Pro 2, open the first plausible product result without purchasing anything, and report exactly this JSON: {\"status\":\"success\",\"product_title\":\"<title>\",\"price_text\":\"<displayed price or unknown>\"}"
+    },
+    {
+      "id": "mock_1774850130162_xht0d4",
+      "created_at": "2026-03-30T05:55:29.615Z",
+      "updated_at": "2026-03-30T06:07:12.474Z",
+      "task_prompt": "Go to https://www.amazon.com/, search for blue bath towels set, open a plausible first product result, add the item to cart if possible, stop before checkout, and report exactly this JSON: {\"status\":\"success\",\"product_title\":\"<title>\",\"added_to_cart\":true,\"cart_signal\":\"<evidence or unknown>\"}. If you cannot add it, return {\"status\":\"error\",\"error\":\"<what went wrong>\"}."
+    },
+    {
+      "id": "mock_1774850130229_io57b7",
+      "created_at": "2026-03-30T05:55:29.615Z",
+      "updated_at": "2026-03-30T06:07:58.438Z",
+      "task_prompt": "Go to https://www.amazon.com/, search for Kindle Paperwhite, open the first plausible product result without purchasing anything, and report exactly this JSON: {\"status\":\"success\",\"product_title\":\"<title>\",\"price_text\":\"<displayed price or unknown>\"}"
+    },
+    {
+      "id": "mock_1774850130433_aqo80p",
+      "created_at": "2026-03-30T05:55:29.615Z",
+      "updated_at": "2026-03-30T06:24:04.564Z",
+      "task_prompt": "Go to https://www.amazon.com/, search for notebook journal hardcover, open a plausible first product result, add the item to cart if possible, stop before checkout, and report exactly this JSON: {\"status\":\"success\",\"product_title\":\"<title>\",\"added_to_cart\":true,\"cart_signal\":\"<evidence or unknown>\"}. If you cannot add it, return {\"status\":\"error\",\"error\":\"<what went wrong>\"}."
+    },
+    {
+      "id": "mock_1774850130485_oryt6s",
+      "created_at": "2026-03-30T05:55:29.615Z",
+      "updated_at": "2026-03-30T06:29:48.300Z",
+      "task_prompt": "Go to https://www.amazon.com/, search for Nintendo Switch Pro Controller, open the first plausible product result without purchasing anything, and report exactly this JSON: {\"status\":\"success\",\"product_title\":\"<title>\",\"price_text\":\"<displayed price or unknown>\"}"
+    },
+    {
+      "id": "mock_1774846494513_zzycer",
+      "created_at": "2026-03-30T04:54:54.513Z",
+      "updated_at": "2026-03-30T04:57:31.355Z",
+      "task_prompt": "Go to https://www.newegg.com/, search for Logitech MX Master 3S, open the first relevant product result, and report exactly this JSON: {\"status\":\"success\",\"product_title\":\"<title>\",\"price_text\":\"<displayed price>\"}"
+    },
+    {
+      "id": "mock_1774846494490_ktqyqh",
+      "created_at": "2026-03-30T04:54:54.490Z",
+      "updated_at": "2026-03-30T04:56:35.237Z",
+      "task_prompt": "Go to https://www.wikipedia.org/, search for Ada Lovelace, open the article page, and report exactly this JSON: {\"status\":\"success\",\"title\":\"<article title>\"}"
+    },
+    {
+      "id": "mock_1774845280107_ibyg37",
+      "created_at": "2026-03-30T04:34:40.107Z",
+      "updated_at": "2026-03-30T04:37:34.234Z",
+      "task_prompt": "Go to https://www.amazon.com/, search for Logitech MX Master 3S, open the first plausible product result without purchasing anything, and report exactly this JSON: {\"status\":\"success\",\"product_title\":\"<title>\",\"price_text\":\"<displayed price or unknown>\"}"
+    },
+    {
+      "id": "mock_1774845280059_u8fu3o",
+      "created_at": "2026-03-30T04:34:40.059Z",
+      "updated_at": "2026-03-30T04:36:04.874Z",
+      "task_prompt": "Go to https://www.newegg.com/, search for Logitech MX Master 3S, open the first relevant product result, and report exactly this JSON: {\"status\":\"success\",\"product_title\":\"<title>\",\"price_text\":\"<displayed price>\"}"
+    },
+    {
+      "id": "mock_1774841109429_k8uo26",
+      "created_at": "2026-03-30T03:25:09.429Z",
+      "updated_at": "2026-03-30T04:10:18.659Z",
+      "task_prompt": "Open https://www.wikipedia.org/ and report exactly this JSON: {\"status\":\"success\",\"title\":\"<page title>\"}"
+    }
+  ],
+  "missing_failed_recordings": [
+    {
+      "id": "mock_1774845280126_mp5288",
+      "created_at": "2026-03-30T04:34:40.126Z",
+      "updated_at": "2026-03-30T04:38:08.287Z",
+      "task_prompt": "Go to https://www.wikipedia.org/, search for Ada Lovelace, open the article page, and report exactly this JSON: {\"status\":\"success\",\"title\":\"<article title>\"}"
+    },
+    {
+      "id": "mock_1774843648394_wfcxey",
+      "created_at": "2026-03-30T04:07:28.394Z",
+      "updated_at": "2026-03-30T04:07:55.239Z",
+      "task_prompt": "Go to https://www.wikipedia.org/, search for Ada Lovelace, open the result if needed, and report exactly this JSON: {\"status\":\"success\",\"title\":\"<article title>\"}"
+    }
+  ]
+}

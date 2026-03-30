@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 from pathlib import Path
@@ -16,6 +17,21 @@ if str(ROOT) not in sys.path:
 def load_json(path: Path) -> dict:
     with open(path, "r", encoding="utf-8") as handle:
         return json.load(handle)
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Render the Amazon OttoAuth learning-curve SVG from a study JSON.")
+    parser.add_argument(
+        "--input",
+        default=str(ROOT / "outputs" / "ottoauth_amazon_study.json"),
+        help="Path to the Amazon study JSON.",
+    )
+    parser.add_argument(
+        "--output",
+        default=str(ROOT / "docs" / "figures" / "ottoauth_amazon_learning_curves.svg"),
+        help="Where to write the SVG figure.",
+    )
+    return parser.parse_args()
 
 
 def save_amazon_curves(study: dict, output: Path) -> None:
@@ -58,8 +74,9 @@ def save_amazon_curves(study: dict, output: Path) -> None:
 
 
 def main() -> None:
-    study = load_json(ROOT / "outputs" / "ottoauth_amazon_study.json")
-    save_amazon_curves(study, ROOT / "docs" / "figures" / "ottoauth_amazon_learning_curves.svg")
+    args = parse_args()
+    study = load_json(Path(args.input))
+    save_amazon_curves(study, Path(args.output))
 
 
 if __name__ == "__main__":

@@ -1,0 +1,21 @@
+{
+  "campaign": "ubereats_search",
+  "device_id": "browser-agent-1",
+  "created_at": "2026-03-30T09:47:40.713Z",
+  "tasks": [
+    {
+      "id": "mock_1774864060714_3a3hbz",
+      "device_id": "browser-agent-1",
+      "campaign": "ubereats_search",
+      "task_prompt": "Go to https://www.ubereats.com/, if prompted enter the delivery address '<ADDRESS>', search for sushi, open a plausible first restaurant result without ordering anything, and report exactly this JSON: {\"status\":\"success\",\"restaurant_name\":\"<name>\",\"delivery_eta\":\"<eta or unknown>\"}. If location or login blocks progress, return {\"status\":\"error\",\"error\":\"<what blocked progress>\"}.",
+      "created_at": "2026-03-30T09:47:40.713Z"
+    },
+    {
+      "id": "mock_1774864061082_tunkpz",
+      "device_id": "browser-agent-1",
+      "campaign": "ubereats_search",
+      "task_prompt": "Go to https://www.ubereats.com/, if prompted enter the delivery address '<ADDRESS>', search for burgers, open a plausible first restaurant result without ordering anything, and report exactly this JSON: {\"status\":\"success\",\"restaurant_name\":\"<name>\",\"delivery_eta\":\"<eta or unknown>\"}. If location or login blocks progress, return {\"status\":\"error\",\"error\":\"<what blocked progress>\"}.",
+      "created_at": "2026-03-30T09:47:40.713Z"
+    }
+  ]
+}

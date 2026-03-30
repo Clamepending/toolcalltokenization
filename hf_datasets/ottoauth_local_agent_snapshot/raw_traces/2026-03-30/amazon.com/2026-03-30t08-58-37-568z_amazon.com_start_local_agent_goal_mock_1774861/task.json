@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-03-30T08:59:42.689Z",
+  "task": {
+    "id": "mock_1774861116742_wbwxuy",
+    "type": "start_local_agent_goal",
+    "url": null,
+    "goal": "Go to https://www.amazon.com/, search for Logitech MX Master 3S, open the first plausible product result without purchasing anything, and report exactly this JSON: {\"status\":\"success\",\"product_title\":\"<title>\",\"price_text\":\"<displayed price or unknown>\"}",
+    "taskPrompt": "Go to https://www.amazon.com/, search for Logitech MX Master 3S, open the first plausible product result without purchasing anything, and report exactly this JSON: {\"status\":\"success\",\"product_title\":\"<title>\",\"price_text\":\"<displayed price or unknown>\"}",
+    "deviceId": "browser-agent-1",
+    "createdAt": "2026-03-30T08:58:36.741Z",
+    "waitedMs": 15207,
+    "remainingQueueSize": 4
+  },
+  "goal": "Go to https://www.amazon.com/, search for Logitech MX Master 3S, open the first plausible product result without purchasing anything, and report exactly this JSON: {\"status\":\"success\",\"product_title\":\"<title>\",\"price_text\":\"<displayed price or unknown>\"}",
+  "sessionId": "session_18",
+  "serverUrl": "http://localhost:3000",
+  "deviceId": "browser-agent-1"
+}

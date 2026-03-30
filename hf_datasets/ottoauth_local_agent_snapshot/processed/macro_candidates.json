@@ -1,0 +1,12 @@
+[
+  {
+    "sequence": [
+      "COMPUTER|role=screenshot",
+      "NAVIGATE|use=B01"
+    ],
+    "length": 2,
+    "support": 3,
+    "occurrences": 3,
+    "macro_id": "M001"
+  }
+]

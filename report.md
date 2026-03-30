@@ -3627,3 +3627,29 @@ So the next meaningful Amazon campaign should remain narrow and cheap:
 - keep collecting `amazon_search` for a bit longer until the curve stabilizes
 - then add a separate `amazon_cart` campaign
 - only attempt `checkout`-style macro discovery after we have repeated add-to-cart traces landing reliably
+
+### Shareable OttoAuth Snapshot
+
+To make the live-agent traces easy to hand to collaborators, the repo now includes a sanitized Hugging Face-style export flow:
+
+- export script: `scripts/export_ottoauth_hf_dataset.py`
+- default snapshot location: `hf_datasets/ottoauth_local_agent_snapshot/`
+
+The snapshot layout separates:
+
+- `raw_traces/`
+  - sanitized `task.json` / `trace.json` folders from the Chrome extension recorder
+- `processed/`
+  - sanitized `raw_trace.jsonl`, `canonical_trace.jsonl`, and summary artifacts used by the macro pipeline
+- `manifests/`
+  - the queued OttoAuth campaign specs, which preserve the exact task batches used for collection
+- `analysis/`
+  - small derived artifacts like `ottoauth_amazon_study.json` and collection-health summaries
+
+In this layout:
+
+- `canonical` means the normalized action representation that macro mining actually operates over
+- `manifests` means the exact queue payloads used to create the traces
+- the Amazon study is included as a convenience artifact for reproducing the current learning-curve claim, not because it is required for the underlying dataset
+
+The current snapshot has been checked for obvious prompt-level addresses and local absolute paths, and it reproduces the Amazon curve directly from `hf_datasets/ottoauth_local_agent_snapshot/processed/canonical_trace.jsonl`.

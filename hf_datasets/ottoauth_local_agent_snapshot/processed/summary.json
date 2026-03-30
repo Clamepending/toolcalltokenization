@@ -1,0 +1,276 @@
+{
+  "canonical_events": 222,
+  "episode_lengths": {
+    "mock_1774734854052_zlyowm": 2,
+    "mock_1774734859695_pzizoh": 2,
+    "mock_1774846494415_17vz22": 12,
+    "mock_1774850130312_zcrfzw": 18,
+    "mock_1774850130351_gdhjsx": 20,
+    "mock_1774850130401_o67wl9": 11,
+    "mock_1774856665174_e8qy7s": 24,
+    "mock_1774858617731_5c7y5o": 6,
+    "mock_1774858693596_r6ce2c": 7,
+    "mock_1774858693920_ev89z4": 9,
+    "mock_1774861116742_wbwxuy": 14,
+    "mock_1774861212299_ql6407": 12,
+    "mock_1774861212641_1kfnvv": 12,
+    "mock_1774862238258_p5chkm": 1,
+    "mock_1774862238593_wzm716": 19,
+    "mock_1774862610332_5q0cez": 30,
+    "mock_1774862993870_18t77t": 23
+  },
+  "episodes": 17,
+  "events": 222,
+  "example_episodes": [
+    {
+      "canonical_sequence": [
+        "COMPUTER|role=screenshot",
+        "NAVIGATE|use=B01"
+      ],
+      "episode_id": "mock_1774734854052_zlyowm",
+      "raw_sequence": [
+        "computer_screenshot",
+        "navigate"
+      ],
+      "task": "You are an Amazon shopping assistant. Your ONLY job is to find the final price of an item shipped to a specific address. Be efficient \u2014 do not restart or go back if you already have the information.\n\nGOAL: Get the full price breakdown (item, shipping, tax, total) for this item shipped to: <ADDRESS>\n\nSTEPS:\n1. Navigate to https://www.amazon.com/dp/B07D3JNBPV\n2. Click \"Add to Cart\".\n3. You may be taken to a \"Added to Cart\" confirmation or directly to checkout. Either way, navigate to checkout:\n   - If you see a \"Proceed to checkout\" button, click it.\n   - Otherwise navigate to https://www.amazon.com/gp/buy/spc/handlers/display.html or https://www.amazon.com/gp/cart/view.html and proceed from there.\n4. You should now be on the checkout/order review page.\n\nADDRESS: The shipping address MUST be: <ADDRESS>\n   - If the page shows a DIFFERENT address, click the \"Change\" link next to the shipping address section.\n   - In the address form, enter the correct address and save/use it.\n   - If you cannot change the address, note this in your report.\n\nGIFT: If you see \"Add gift options\" or a \"This order contains a gift\" checkbox anywhere on checkout, click/check it. If you don't see it, skip this \u2014 don't go hunting for it.\n\nPRICE: Once you can see the order summary with Items, Shipping, Tax, and Order Total:\n   - Read those numbers. That's all you need.\n   - DO NOT click \"Place your order\". DO NOT go back to the cart. Just read and report.\n\nIMPORTANT RULES:\n- If you already see the price breakdown on screen, READ IT AND REPORT IMMEDIATELY. Do not navigate away.\n- Do not go back to redo steps you've already completed.\n- Use screenshots to read prices \u2014 they are the most reliable source.\n- Convert dollar amounts to cents (e.g. $19.14 = 1914).\n\nReport EXACTLY this JSON:\n{\"status\":\"success\",\"item_price_cents\":<item in cents>,\"shipping_cents\":<shipping in cents>,\"tax_cents\":<tax in cents>,\"amazon_total_cents\":<total in cents>,\"product_title\":\"<product name>\"}\n\nIf something goes wrong:\n{\"status\":\"error\",\"error\":\"<what went wrong>\"}",
+      "task_status": "completed",
+      "website": "amazon.com"
+    },
+    {
+      "canonical_sequence": [
+        "COMPUTER|role=screenshot",
+        "NAVIGATE|use=B01"
+      ],
+      "episode_id": "mock_1774734859695_pzizoh",
+      "raw_sequence": [
+        "computer_screenshot",
+        "navigate"
+      ],
+      "task": "You are an Amazon shopping assistant. Your ONLY job is to find the final price of an item shipped to a specific address. Be efficient \u2014 do not restart or go back if you already have the information.\n\nGOAL: Get the full price breakdown (item, shipping, tax, total) for this item shipped to: <ADDRESS>\n\nSTEPS:\n1. Navigate to https://www.amazon.com/dp/B07D3JNBPV\n2. Click \"Add to Cart\".\n3. You may be taken to a \"Added to Cart\" confirmation or directly to checkout. Either way, navigate to checkout:\n   - If you see a \"Proceed to checkout\" button, click it.\n   - Otherwise navigate to https://www.amazon.com/gp/buy/spc/handlers/display.html or https://www.amazon.com/gp/cart/view.html and proceed from there.\n4. You should now be on the checkout/order review page.\n\nADDRESS: The shipping address MUST be: <ADDRESS>\n   - If the page shows a DIFFERENT address, click the \"Change\" link next to the shipping address section.\n   - In the address form, enter the correct address and save/use it.\n   - If you cannot change the address, note this in your report.\n\nGIFT: If you see \"Add gift options\" or a \"This order contains a gift\" checkbox anywhere on checkout, click/check it. If you don't see it, skip this \u2014 don't go hunting for it.\n\nPRICE: Once you can see the order summary with Items, Shipping, Tax, and Order Total:\n   - Read those numbers. That's all you need.\n   - DO NOT click \"Place your order\". DO NOT go back to the cart. Just read and report.\n\nIMPORTANT RULES:\n- If you already see the price breakdown on screen, READ IT AND REPORT IMMEDIATELY. Do not navigate away.\n- Do not go back to redo steps you've already completed.\n- Use screenshots to read prices \u2014 they are the most reliable source.\n- Convert dollar amounts to cents (e.g. $19.14 = 1914).\n\nReport EXACTLY this JSON:\n{\"status\":\"success\",\"item_price_cents\":<item in cents>,\"shipping_cents\":<shipping in cents>,\"tax_cents\":<tax in cents>,\"amazon_total_cents\":<total in cents>,\"product_title\":\"<product name>\"}\n\nIf something goes wrong:\n{\"status\":\"error\",\"error\":\"<what went wrong>\"}",
+      "task_status": "completed",
+      "website": "amazon.com"
+    },
+    {
+      "canonical_sequence": [
+        "COMPUTER|role=screenshot",
+        "NAVIGATE|use=B01",
+        "READ_PAGE",
+        "FIND|use=B02",
+        "FORM_INPUT|use=B03",
+        "COMPUTER|role=key|use=B04",
+        "COMPUTER|role=wait",
+        "READ_PAGE",
+        "FIND|use=B05",
+        "COMPUTER|role=screenshot",
+        "COMPUTER|role=left_click",
+        "COMPUTER|role=scroll"
+      ],
+      "episode_id": "mock_1774846494415_17vz22",
+      "raw_sequence": [
+        "computer_screenshot",
+        "navigate",
+        "read_page",
+        "find",
+        "form_input",
+        "computer_key",
+        "computer_wait",
+        "read_page",
+        "find",
+        "computer_screenshot",
+        "computer_left_click",
+        "computer_scroll"
+      ],
+      "task": "Go to https://www.amazon.com/, search for Logitech MX Master 3S, open the first plausible product result without purchasing anything, and report exactly this JSON: {\"status\":\"success\",\"product_title\":\"<title>\",\"price_text\":\"<displayed price or unknown>\"}",
+      "task_status": "completed",
+      "website": "amazon.com"
+    },
+    {
+      "canonical_sequence": [
+        "COMPUTER|role=screenshot",
+        "NAVIGATE|use=B01",
+        "READ_PAGE",
+        "FIND|use=B02",
+        "FORM_INPUT|use=B03",
+        "FIND|use=B04",
+        "COMPUTER|role=screenshot",
+        "COMPUTER|role=left_click",
+        "COMPUTER|role=wait",
+        "READ_PAGE",
+        "FIND|use=B05",
+        "JAVASCRIPT_TOOL|use=B06",
+        "JAVASCRIPT_TOOL|use=B07",
+        "JAVASCRIPT_TOOL|use=B08",
+        "JAVASCRIPT_TOOL|use=B09",
+        "NAVIGATE|use=B10",
+        "JAVASCRIPT_TOOL|use=B11",
+        "JAVASCRIPT_TOOL|use=B12"
+      ],
+      "episode_id": "mock_1774850130312_zcrfzw",
+      "raw_sequence": [
+        "computer_screenshot",
+        "navigate",
+        "read_page",
+        "find",
+        "form_input",
+        "find",
+        "computer_screenshot",
+        "computer_left_click",
+        "computer_wait",
+        "read_page",
+        "find",
+        "javascript_tool",
+        "javascript_tool",
+        "javascript_tool",
+        "javascript_tool",
+        "navigate",
+        "javascript_tool",
+        "javascript_tool"
+      ],
+      "task": "Go to https://www.amazon.com/, search for Samsung T7 SSD 1TB, open the first plausible product result without purchasing anything, and report exactly this JSON: {\"status\":\"success\",\"product_title\":\"<title>\",\"price_text\":\"<displayed price or unknown>\"}",
+      "task_status": "completed",
+      "website": "amazon.com"
+    },
+    {
+      "canonical_sequence": [
+        "COMPUTER|role=screenshot",
+        "NAVIGATE|use=B01",
+        "READ_PAGE",
+        "FIND|use=B02",
+        "FORM_INPUT|use=B03",
+        "COMPUTER|role=key|use=B04",
+        "COMPUTER|role=wait",
+        "COMPUTER|role=screenshot",
+        "READ_PAGE",
+        "FIND|use=B05",
+        "COMPUTER|role=scroll",
+        "COMPUTER|role=left_click",
+        "COMPUTER|role=wait",
+        "FIND|use=B06",
+        "COMPUTER|role=left_click",
+        "COMPUTER|role=key|use=B07",
+        "COMPUTER|role=key|use=B08",
+        "NAVIGATE|use=B09",
+        "COMPUTER|role=left_click",
+        "COMPUTER|role=wait"
+      ],
+      "episode_id": "mock_1774850130351_gdhjsx",
+      "raw_sequence": [
+        "computer_screenshot",
+        "navigate",
+        "read_page",
+        "find",
+        "form_input",
+        "computer_key",
+        "computer_wait",
+        "computer_screenshot",
+        "read_page",
+        "find",
+        "computer_scroll",
+        "computer_left_click",
+        "computer_wait",
+        "find",
+        "computer_left_click",
+        "computer_key",
+        "computer_key",
+        "navigate",
+        "computer_left_click",
+        "computer_wait"
+      ],
+      "task": "Go to https://www.amazon.com/, search for usb c cable 6ft, open a plausible first product result, add the item to cart if possible, stop before checkout, and report exactly this JSON: {\"status\":\"success\",\"product_title\":\"<title>\",\"added_to_cart\":true,\"cart_signal\":\"<evidence or unknown>\"}. If you cannot add it, return {\"status\":\"error\",\"error\":\"<what went wrong>\"}.",
+      "task_status": "completed",
+      "website": "amazon.com"
+    }
+  ],
+  "sites": {
+    "amazon.com": 222
+  },
+  "task_status_counts": {
+    "completed": 182,
+    "failed": 39,
+    "running": 1
+  },
+  "top_action_types": [
+    [
+      "computer_left_click",
+      37
+    ],
+    [
+      "computer_screenshot",
+      30
+    ],
+    [
+      "find",
+      30
+    ],
+    [
+      "read_page",
+      27
+    ],
+    [
+      "computer_key",
+      21
+    ],
+    [
+      "navigate",
+      20
+    ],
+    [
+      "computer_wait",
+      17
+    ],
+    [
+      "javascript_tool",
+      15
+    ],
+    [
+      "form_input",
+      11
+    ],
+    [
+      "computer_scroll",
+      8
+    ],
+    [
+      "computer_type",
+      3
+    ],
+    [
+      "computer_triple_click",
+      2
+    ],
+    [
+      "get_page_text",
+      1
+    ]
+  ],
+  "top_tool_names": [
+    [
+      "computer",
+      118
+    ],
+    [
+      "find",
+      30
+    ],
+    [
+      "read_page",
+      27
+    ],
+    [
+      "navigate",
+      20
+    ],
+    [
+      "javascript_tool",
+      15
+    ],
+    [
+      "form_input",
+      11
+    ],
+    [
+      "get_page_text",
+      1
+    ]
+  ]
+}

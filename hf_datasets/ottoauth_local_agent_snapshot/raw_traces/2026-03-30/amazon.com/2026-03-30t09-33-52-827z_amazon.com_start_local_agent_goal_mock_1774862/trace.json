@@ -1,0 +1,99 @@
+{
+  "schemaVersion": 1,
+  "startedAt": "2026-03-30T09:33:52.827Z",
+  "completedAt": "2026-03-30T09:33:53.392Z",
+  "status": "failed",
+  "result": null,
+  "error": "API error: 400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.\"},\"request_id\":\"req_011CZZ2zviBuKoesUyyttSYw\"}",
+  "taskId": "mock_1774862994191_wsorao",
+  "taskType": "start_local_agent_goal",
+  "goal": "Go to https://www.amazon.com/, search for white ankle socks women, open a plausible first product result, add the item to cart if possible, stop before checkout, and report exactly this JSON: {\"status\":\"success\",\"product_title\":\"<title>\",\"added_to_cart\":true,\"cart_signal\":\"<evidence or unknown>\"}. If you cannot add it, return {\"status\":\"error\",\"error\":\"<what went wrong>\"}.",
+  "url": null,
+  "sessionId": "session_5",
+  "serverUrl": "http://localhost:3000",
+  "deviceId": "browser-agent-1",
+  "traceFolder": "2026-03-30t09-33-52-827z_amazon.com_start_local_agent_goal_mock_1774862",
+  "events": [
+    {
+      "timestamp": 1774863232827,
+      "type": "task_received",
+      "payload": {
+        "taskId": "mock_1774862994191_wsorao",
+        "taskType": "start_local_agent_goal",
+        "goal": "Go to https://www.amazon.com/, search for white ankle socks women, open a plausible first product result, add the item to cart if possible, stop before checkout, and report exactly this JSON: {\"status\":\"success\",\"product_title\":\"<title>\",\"added_to_cart\":true,\"cart_signal\":\"<evidence or unknown>\"}. If you cannot add it, return {\"status\":\"error\",\"error\":\"<what went wrong>\"}.",
+        "url": null,
+        "sessionId": "session_5"
+      }
+    },
+    {
+      "timestamp": 1774863232877,
+      "type": "session_initialized",
+      "payload": {
+        "sessionId": "session_5"
+      }
+    },
+    {
+      "timestamp": 1774863232878,
+      "type": "agent_loop_started",
+      "payload": {
+        "sessionId": "session_5",
+        "userPrompt": "Go to https://www.amazon.com/, search for white ankle socks women, open a plausible first product result, add the item to cart if possible, stop before checkout, and report exactly this JSON: {\"status\":\"success\",\"product_title\":\"<title>\",\"added_to_cart\":true,\"cart_signal\":\"<evidence or unknown>\"}. If you cannot add it, return {\"status\":\"error\",\"error\":\"<what went wrong>\"}."
+      }
+    },
+    {
+      "timestamp": 1774863232883,
+      "type": "user_prompt",
+      "payload": {
+        "text": "Go to https://www.amazon.com/, search for white ankle socks women, open a plausible first product result, add the item to cart if possible, stop before checkout, and report exactly this JSON: {\"status\":\"success\",\"product_title\":\"<title>\",\"added_to_cart\":true,\"cart_signal\":\"<evidence or unknown>\"}. If you cannot add it, return {\"status\":\"error\",\"error\":\"<what went wrong>\"}."
+      }
+    },
+    {
+      "timestamp": 1774863232976,
+      "type": "model_error",
+      "payload": {
+        "error": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.\"},\"request_id\":\"req_011CZZ2zviBuKoesUyyttSYw\"}",
+        "loopCount": 1
+      }
+    },
+    {
+      "timestamp": 1774863232977,
+      "type": "agent_loop_finished",
+      "payload": {
+        "sessionId": "session_5",
+        "error": "API error: 400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.\"},\"request_id\":\"req_011CZZ2zviBuKoesUyyttSYw\"}"
+      }
+    },
+    {
+      "timestamp": 1774863232977,
+      "type": "task_failed",
+      "payload": {
+        "taskId": "mock_1774862994191_wsorao",
+        "error": "API error: 400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.\"},\"request_id\":\"req_011CZZ2zviBuKoesUyyttSYw\"}"
+      }
+    }
+  ],
+  "messages": [
+    {
+      "id": "user_1774863232883",
+      "role": "user",
+      "timestamp": 1774863232883,
+      "blocks": [
+        {
+          "type": "text",
+          "text": "Go to https://www.amazon.com/, search for white ankle socks women, open a plausible first product result, add the item to cart if possible, stop before checkout, and report exactly this JSON: {\"status\":\"success\",\"product_title\":\"<title>\",\"added_to_cart\":true,\"cart_signal\":\"<evidence or unknown>\"}. If you cannot add it, return {\"status\":\"error\",\"error\":\"<what went wrong>\"}."
+        }
+      ]
+    },
+    {
+      "id": "asst_1774863232883_1",
+      "role": "assistant",
+      "timestamp": 1774863232883,
+      "blocks": [
+        {
+          "type": "text",
+          "text": "Error: 400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.\"},\"request_id\":\"req_011CZZ2zviBuKoesUyyttSYw\"}"
+        }
+      ]
+    }
+  ]
+}

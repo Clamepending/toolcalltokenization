@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-03-30T19:23:59.123Z",
+  "task": {
+    "id": "mock_1774898301377_rhxhcb",
+    "type": "start_local_agent_goal",
+    "url": null,
+    "goal": "Go to https://www.ubereats.com/, if prompted enter the delivery address '<ADDRESS>', search for pizza, open a plausible first restaurant result, add a pizza to the cart if possible, proceed as far toward checkout as possible without placing any order, and report exactly this JSON: {\"status\":\"success\",\"restaurant_name\":\"<name>\",\"item_name\":\"<item or unknown>\",\"reached_checkout\":true,\"checkout_signal\":\"<evidence or unknown>\"}. If location, login, or site friction blocks progress, return {\"status\":\"error\",\"error\":\"<what blocked progress>\"}.",
+    "taskPrompt": "Go to https://www.ubereats.com/, if prompted enter the delivery address '<ADDRESS>', search for pizza, open a plausible first restaurant result, add a pizza to the cart if possible, proceed as far toward checkout as possible without placing any order, and report exactly this JSON: {\"status\":\"success\",\"restaurant_name\":\"<name>\",\"item_name\":\"<item or unknown>\",\"reached_checkout\":true,\"checkout_signal\":\"<evidence or unknown>\"}. If location, login, or site friction blocks progress, return {\"status\":\"error\",\"error\":\"<what blocked progress>\"}.",
+    "deviceId": "browser-agent-1",
+    "createdAt": "2026-03-30T19:18:21.377Z",
+    "waitedMs": 13773,
+    "remainingQueueSize": 4
+  },
+  "goal": "Go to https://www.ubereats.com/, if prompted enter the delivery address '<ADDRESS>', search for pizza, open a plausible first restaurant result, add a pizza to the cart if possible, proceed as far toward checkout as possible without placing any order, and report exactly this JSON: {\"status\":\"success\",\"restaurant_name\":\"<name>\",\"item_name\":\"<item or unknown>\",\"reached_checkout\":true,\"checkout_signal\":\"<evidence or unknown>\"}. If location, login, or site friction blocks progress, return {\"status\":\"error\",\"error\":\"<what blocked progress>\"}.",
+  "sessionId": "session_5",
+  "serverUrl": "http://localhost:3000",
+  "deviceId": "browser-agent-1"
+}

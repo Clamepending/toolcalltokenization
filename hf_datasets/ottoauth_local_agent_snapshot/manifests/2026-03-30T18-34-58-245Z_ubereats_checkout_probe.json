@@ -1,0 +1,14 @@
+{
+  "campaign": "ubereats_checkout_probe",
+  "device_id": "browser-agent-1",
+  "created_at": "2026-03-30T18:34:57.874Z",
+  "tasks": [
+    {
+      "id": "mock_1774895697874_1yqmrt",
+      "device_id": "browser-agent-1",
+      "campaign": "ubereats_checkout_probe",
+      "task_prompt": "Go to https://www.ubereats.com/, if prompted enter the delivery address '<ADDRESS>', search for pizza, open a plausible first restaurant result, add a pizza to the cart if possible, proceed as far toward checkout as possible without placing any order, and report exactly this JSON: {\"status\":\"success\",\"restaurant_name\":\"<name>\",\"item_name\":\"<item or unknown>\",\"reached_checkout\":true,\"checkout_signal\":\"<evidence or unknown>\"}. If location, login, or site friction blocks progress, return {\"status\":\"error\",\"error\":\"<what blocked progress>\"}.",
+      "created_at": "2026-03-30T18:34:57.874Z"
+    }
+  ]
+}

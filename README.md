@@ -293,3 +293,40 @@ Current real-agent collection status:
 - the current on-disk sample is still tiny and dominated by Amazon traces
 - with only three local episodes, no nontrivial macro survives mining yet
 - the current bottleneck for this path is collection density and recorder consistency, not the ingest or mining code
+
+## Shareable OttoAuth Snapshot
+
+To export a sanitized Hugging Face-ready OttoAuth snapshot for colleagues:
+
+```bash
+python3 scripts/export_ottoauth_hf_dataset.py \
+  --output-dir hf_datasets/ottoauth_local_agent_snapshot
+```
+
+This writes:
+
+- `hf_datasets/ottoauth_local_agent_snapshot/raw_traces/`
+- `hf_datasets/ottoauth_local_agent_snapshot/processed/`
+- `hf_datasets/ottoauth_local_agent_snapshot/manifests/`
+- `hf_datasets/ottoauth_local_agent_snapshot/analysis/`
+- `hf_datasets/ottoauth_local_agent_snapshot/figures/`
+- `hf_datasets/ottoauth_local_agent_snapshot/metadata/export_summary.json`
+
+The snapshot includes:
+
+- sanitized raw `task.json` / `trace.json` folders
+- sanitized processed JSONL (`raw_trace.jsonl`, `canonical_trace.jsonl`)
+- queued campaign manifests
+- the current Amazon study and collection-health artifacts
+
+To re-run the Amazon study from the snapshot:
+
+```bash
+python3 scripts/run_ottoauth_amazon_study.py \
+  --input hf_datasets/ottoauth_local_agent_snapshot/processed/canonical_trace.jsonl \
+  --output /tmp/ottoauth_amazon_study.json
+
+python3 scripts/generate_ottoauth_amazon_figures.py \
+  --input /tmp/ottoauth_amazon_study.json \
+  --output /tmp/ottoauth_amazon_learning_curves.svg
+```

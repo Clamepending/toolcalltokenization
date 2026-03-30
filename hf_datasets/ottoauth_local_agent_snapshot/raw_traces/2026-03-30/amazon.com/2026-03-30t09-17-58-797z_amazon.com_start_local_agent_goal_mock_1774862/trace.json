@@ -1,0 +1,137 @@
+{
+  "schemaVersion": 1,
+  "startedAt": "2026-03-30T09:17:58.797Z",
+  "completedAt": null,
+  "status": "running",
+  "result": null,
+  "error": null,
+  "taskId": "mock_1774862238258_p5chkm",
+  "taskType": "start_local_agent_goal",
+  "goal": "Go to https://www.amazon.com/, search for black crew socks men, open a plausible first product result, add the item to cart if possible, stop before checkout, and report exactly this JSON: {\"status\":\"success\",\"product_title\":\"<title>\",\"added_to_cart\":true,\"cart_signal\":\"<evidence or unknown>\"}. If you cannot add it, return {\"status\":\"error\",\"error\":\"<what went wrong>\"}.",
+  "url": null,
+  "sessionId": "session_2",
+  "serverUrl": "http://localhost:3000",
+  "deviceId": "browser-agent-1",
+  "traceFolder": "2026-03-30t09-17-58-797z_amazon.com_start_local_agent_goal_mock_1774862",
+  "events": [
+    {
+      "timestamp": 1774862278797,
+      "type": "task_received",
+      "payload": {
+        "taskId": "mock_1774862238258_p5chkm",
+        "taskType": "start_local_agent_goal",
+        "goal": "Go to https://www.amazon.com/, search for black crew socks men, open a plausible first product result, add the item to cart if possible, stop before checkout, and report exactly this JSON: {\"status\":\"success\",\"product_title\":\"<title>\",\"added_to_cart\":true,\"cart_signal\":\"<evidence or unknown>\"}. If you cannot add it, return {\"status\":\"error\",\"error\":\"<what went wrong>\"}.",
+        "url": null,
+        "sessionId": "session_2"
+      }
+    },
+    {
+      "timestamp": 1774862278809,
+      "type": "session_initialized",
+      "payload": {
+        "sessionId": "session_2"
+      }
+    },
+    {
+      "timestamp": 1774862278810,
+      "type": "agent_loop_started",
+      "payload": {
+        "sessionId": "session_2",
+        "userPrompt": "Go to https://www.amazon.com/, search for black crew socks men, open a plausible first product result, add the item to cart if possible, stop before checkout, and report exactly this JSON: {\"status\":\"success\",\"product_title\":\"<title>\",\"added_to_cart\":true,\"cart_signal\":\"<evidence or unknown>\"}. If you cannot add it, return {\"status\":\"error\",\"error\":\"<what went wrong>\"}."
+      }
+    },
+    {
+      "timestamp": 1774862278831,
+      "type": "user_prompt",
+      "payload": {
+        "text": "Go to https://www.amazon.com/, search for black crew socks men, open a plausible first product result, add the item to cart if possible, stop before checkout, and report exactly this JSON: {\"status\":\"success\",\"product_title\":\"<title>\",\"added_to_cart\":true,\"cart_signal\":\"<evidence or unknown>\"}. If you cannot add it, return {\"status\":\"error\",\"error\":\"<what went wrong>\"}."
+      }
+    },
+    {
+      "timestamp": 1774862281502,
+      "type": "assistant_text",
+      "payload": {
+        "loopCount": 1,
+        "text": "I'll help you complete this task. Let me start by taking a screenshot to see the current state of the browser."
+      }
+    },
+    {
+      "timestamp": 1774862281502,
+      "type": "tool_use",
+      "payload": {
+        "loopCount": 1,
+        "toolUseId": "toolu_01BvkGbei43XLPjKN5DnLNcs",
+        "name": "computer",
+        "input": {
+          "action": "screenshot"
+        }
+      }
+    },
+    {
+      "timestamp": 1774862281505,
+      "type": "tool_result",
+      "payload": {
+        "loopCount": 1,
+        "toolUseId": "toolu_01BvkGbei43XLPjKN5DnLNcs",
+        "name": "computer",
+        "durationMs": 2,
+        "text": "Cannot access about:blank \u2014 browser system pages block extension access. Use the navigate tool to go to a regular webpage first (e.g. navigate to \"https://google.com\").",
+        "imageCount": 0
+      }
+    },
+    {
+      "timestamp": 1774862283811,
+      "type": "heartbeat",
+      "payload": {
+        "taskId": "mock_1774862238258_p5chkm",
+        "sessionId": "session_2",
+        "messageCount": 3,
+        "isRunning": true
+      }
+    }
+  ],
+  "messages": [
+    {
+      "id": "user_1774862278831",
+      "role": "user",
+      "timestamp": 1774862278831,
+      "blocks": [
+        {
+          "type": "text",
+          "text": "Go to https://www.amazon.com/, search for black crew socks men, open a plausible first product result, add the item to cart if possible, stop before checkout, and report exactly this JSON: {\"status\":\"success\",\"product_title\":\"<title>\",\"added_to_cart\":true,\"cart_signal\":\"<evidence or unknown>\"}. If you cannot add it, return {\"status\":\"error\",\"error\":\"<what went wrong>\"}."
+        }
+      ]
+    },
+    {
+      "id": "asst_1774862278832_1",
+      "role": "assistant",
+      "timestamp": 1774862278832,
+      "blocks": [
+        {
+          "type": "text",
+          "text": "I'll help you complete this task. Let me start by taking a screenshot to see the current state of the browser."
+        },
+        {
+          "type": "tool_use",
+          "id": "toolu_01BvkGbei43XLPjKN5DnLNcs",
+          "name": "computer",
+          "input": {
+            "action": "screenshot"
+          }
+        },
+        {
+          "type": "tool_result",
+          "toolUseId": "toolu_01BvkGbei43XLPjKN5DnLNcs",
+          "text": "Cannot access about:blank \u2014 browser system pages block extension access. Use the navigate tool to go to a regular webpage first (e.g. navigate to \"https://google.com\").",
+          "hasImage": false
+        }
+      ]
+    },
+    {
+      "id": "asst_1774862281509_2",
+      "role": "assistant",
+      "timestamp": 1774862281509,
+      "blocks": []
+    }
+  ]
+}

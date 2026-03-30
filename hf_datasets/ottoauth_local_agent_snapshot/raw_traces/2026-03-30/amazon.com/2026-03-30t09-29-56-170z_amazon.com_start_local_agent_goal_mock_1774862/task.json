@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-03-30T09:33:48.802Z",
+  "task": {
+    "id": "mock_1774862993870_18t77t",
+    "type": "start_local_agent_goal",
+    "url": null,
+    "goal": "Go to https://www.amazon.com/, search for black crew socks men, open a plausible first product result, add the item to cart if possible, stop before checkout, and report exactly this JSON: {\"status\":\"success\",\"product_title\":\"<title>\",\"added_to_cart\":true,\"cart_signal\":\"<evidence or unknown>\"}. If you cannot add it, return {\"status\":\"error\",\"error\":\"<what went wrong>\"}.",
+    "taskPrompt": "Go to https://www.amazon.com/, search for black crew socks men, open a plausible first product result, add the item to cart if possible, stop before checkout, and report exactly this JSON: {\"status\":\"success\",\"product_title\":\"<title>\",\"added_to_cart\":true,\"cart_signal\":\"<evidence or unknown>\"}. If you cannot add it, return {\"status\":\"error\",\"error\":\"<what went wrong>\"}.",
+    "deviceId": "browser-agent-1",
+    "createdAt": "2026-03-30T09:29:53.869Z",
+    "waitedMs": 151,
+    "remainingQueueSize": 5
+  },
+  "goal": "Go to https://www.amazon.com/, search for black crew socks men, open a plausible first product result, add the item to cart if possible, stop before checkout, and report exactly this JSON: {\"status\":\"success\",\"product_title\":\"<title>\",\"added_to_cart\":true,\"cart_signal\":\"<evidence or unknown>\"}. If you cannot add it, return {\"status\":\"error\",\"error\":\"<what went wrong>\"}.",
+  "sessionId": "session_4",
+  "serverUrl": "http://localhost:3000",
+  "deviceId": "browser-agent-1"
+}

@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "startedAt": "2026-03-30T07:47:34.065Z",
+  "completedAt": null,
+  "status": "running",
+  "result": null,
+  "error": null,
+  "taskId": "mock_1774856665534_n4s6oz",
+  "taskType": "start_local_agent_goal",
+  "goal": "Go to https://www.amazon.com/, search for Apple AirPods Pro 2, open the first plausible product result without purchasing anything, and report exactly this JSON: {\"status\":\"success\",\"product_title\":\"<title>\",\"price_text\":\"<displayed price or unknown>\"}",
+  "url": null,
+  "sessionId": "session_13",
+  "serverUrl": "http://localhost:3000",
+  "deviceId": "browser-agent-1",
+  "traceFolder": "2026-03-30t07-47-34-065z_amazon.com_start_local_agent_goal_mock_1774856",
+  "events": [
+    {
+      "timestamp": 1774856854065,
+      "type": "task_received",
+      "payload": {
+        "taskId": "mock_1774856665534_n4s6oz",
+        "taskType": "start_local_agent_goal",
+        "goal": "Go to https://www.amazon.com/, search for Apple AirPods Pro 2, open the first plausible product result without purchasing anything, and report exactly this JSON: {\"status\":\"success\",\"product_title\":\"<title>\",\"price_text\":\"<displayed price or unknown>\"}",
+        "url": null,
+        "sessionId": "session_13"
+      }
+    }
+  ],
+  "messages": []
+}

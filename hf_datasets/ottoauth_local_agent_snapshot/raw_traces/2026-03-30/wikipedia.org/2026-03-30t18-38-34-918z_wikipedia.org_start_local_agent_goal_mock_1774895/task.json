@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-03-30T18:39:02.625Z",
+  "task": {
+    "id": "mock_1774895913984_0z2wbc",
+    "type": "start_local_agent_goal",
+    "url": null,
+    "goal": "Go to https://www.wikipedia.org/, search for Ada Lovelace, open the article page, and report exactly this JSON: {\"status\":\"success\",\"title\":\"<article title>\"}",
+    "taskPrompt": "Go to https://www.wikipedia.org/, search for Ada Lovelace, open the article page, and report exactly this JSON: {\"status\":\"success\",\"title\":\"<article title>\"}",
+    "deviceId": "browser-agent-1",
+    "createdAt": "2026-03-30T18:38:33.984Z",
+    "waitedMs": 19403,
+    "remainingQueueSize": 4
+  },
+  "goal": "Go to https://www.wikipedia.org/, search for Ada Lovelace, open the article page, and report exactly this JSON: {\"status\":\"success\",\"title\":\"<article title>\"}",
+  "sessionId": "session_4",
+  "serverUrl": "http://localhost:3000",
+  "deviceId": "browser-agent-1"
+}

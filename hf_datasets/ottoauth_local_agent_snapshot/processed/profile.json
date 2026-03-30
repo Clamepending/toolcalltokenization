@@ -1,0 +1,58 @@
+{
+  "action_types": {
+    "computer_key": 1,
+    "computer_left_click": 1,
+    "computer_screenshot": 4,
+    "computer_scroll": 1,
+    "computer_wait": 1,
+    "find": 2,
+    "form_input": 1,
+    "navigate": 3,
+    "read_page": 2
+  },
+  "avg_episode_length": 5.3333,
+  "canonicalization_mode": "signature",
+  "episodes": 3,
+  "events": 16,
+  "max_episode_length": 12,
+  "min_episode_length": 2,
+  "slot_value_rate": 0.4375,
+  "top_canonical_actions": [
+    {
+      "action": "COMPUTER_SCREENSHOT|role=screenshot",
+      "count": 4
+    },
+    {
+      "action": "NAVIGATE|value=<TEXT>",
+      "count": 3
+    },
+    {
+      "action": "READ_PAGE",
+      "count": 2
+    },
+    {
+      "action": "FIND|value=<TEXT>",
+      "count": 2
+    },
+    {
+      "action": "FORM_INPUT|selector=ref_75|value=<TEXT>",
+      "count": 1
+    },
+    {
+      "action": "COMPUTER_KEY|role=key|value=<TEXT>",
+      "count": 1
+    },
+    {
+      "action": "COMPUTER_WAIT|role=wait",
+      "count": 1
+    },
+    {
+      "action": "COMPUTER_LEFT_CLICK|role=left_click",
+      "count": 1
+    },
+    {
+      "action": "COMPUTER_SCROLL|role=scroll",
+      "count": 1
+    }
+  ]
+}

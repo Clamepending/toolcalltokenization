@@ -1,0 +1,26 @@
+{
+  "raw_trace_folders": 21,
+  "raw": {
+    "json_files": 42,
+    "jsonl_files": 0
+  },
+  "processed": {
+    "json_files": 4,
+    "jsonl_files": 2
+  },
+  "manifest_files": 18,
+  "analysis": {
+    "json_files": 3
+  },
+  "figure_files": 2,
+  "source_paths": {
+    "raw_root": "raw OttoAuth trace collection",
+    "processed_root": "processed OttoAuth live collection outputs",
+    "manifests_root": "queued OttoAuth campaign manifests"
+  },
+  "redactions": {
+    "addresses": "<ADDRESS>",
+    "emails": "<EMAIL>",
+    "phones": "<PHONE>"
+  }
+}
