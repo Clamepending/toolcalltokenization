@@ -119,6 +119,12 @@ class TraceUtilsTest(unittest.TestCase):
         family = infer_task_family("Find flights from Chicago to London and return on April 23.")
         self.assertEqual(family, "flight")
 
+    def test_infer_task_family_treats_add_to_cart_before_checkout_as_cart(self) -> None:
+        family = infer_task_family(
+            "Go to Amazon, add the item to cart if possible, stop before checkout, and report success."
+        )
+        self.assertEqual(family, "cart")
+
     def test_group_rows_supports_website_task_family(self) -> None:
         grouped = group_rows(
             [

@@ -267,6 +267,18 @@ def infer_task_family(row_or_text: object) -> str:
     normalized = normalize_whitespace(text).lower()
     if not normalized:
         return "generic"
+    # OttoAuth collection prompts often say "add to cart ... stop before checkout".
+    # Those are cart workflows, not checkout workflows, even though they mention checkout.
+    if (
+        ("add to cart" in normalized or "to cart" in normalized)
+        and (
+            "stop before checkout" in normalized
+            or "stop before check out" in normalized
+            or "without checkout" in normalized
+            or "without check out" in normalized
+        )
+    ):
+        return "cart"
     for family, hints in TASK_FAMILY_HINTS:
         if any(hint in normalized for hint in hints):
             return family

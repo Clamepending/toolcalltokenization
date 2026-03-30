@@ -3473,6 +3473,94 @@ Current best Amazon point:
 - held-out episodes: `2`
 - promoted macros: `1`
 - parameterized promoted macros: `1`
+
+### Amazon Cart Family Emerges After Fixing Task-Family Labeling
+
+The next Amazon finding was subtle but important. The cart traces were present in the local corpus, but they were initially being diluted into the `checkout` bucket because the task-family heuristic saw the phrase `stop before checkout` before it recognized the stronger signal `add the item to cart`.
+
+After tightening that heuristic, the Amazon study now exposes four curves:
+
+- `amazon.com`
+- `amazon.com::search`
+- `amazon.com::cart`
+- `amazon.com::checkout`
+
+The current best points are now:
+
+- site-wide `amazon.com`: `26.67%` decision reduction, `2` promoted macros
+- `amazon.com::search`: `41.67%` decision reduction, `1` promoted macro
+- `amazon.com::cart`: `22.22%` decision reduction, `1` promoted macro
+- `amazon.com::checkout`: `0%` decision reduction, `0` promoted macros
+
+So the Amazon story is now more realistic:
+
+- search is genuinely compressible on the live production agent
+- cart is beginning to compress too
+- checkout still has too little clean repeated data to surface anything reliable
+
+### Why `add_to_cart()` Still Has Not Emerged
+
+The first cart-family positive result is not yet a true `add_to_cart()` macro. The promoted cart macro is still just the shared search-entry prefix:
+
+- `screenshot`
+- `navigate`
+- `read_page`
+- `find`
+- `form_input`
+- `key`
+
+This cart macro saves steps because every successful cart trace starts by searching Amazon in roughly the same way. But the actual post-search cart behavior is still too inconsistent to collapse into a reusable tool.
+
+The two clean cart successes diverge immediately after the shared prefix:
+
+`white ankle socks women`
+- `wait -> read_page -> find -> read_page -> click -> click -> wait -> find -> click -> read_page -> get_page_text -> javascript_tool -> screenshot`
+
+`black crew socks men`
+- `wait -> read_page -> scroll -> screenshot -> find -> find -> read_page -> find -> click -> wait -> find -> click -> click -> click -> click -> click -> read_page -> scroll -> screenshot -> click -> key -> key -> key -> read_page`
+
+That divergence explains the current bottleneck precisely:
+
+- the agent is finding the search box consistently
+- it is not yet traversing result pages and product pages in a consistent enough way for a monolithic `add_to_cart()` routine to survive held-out replay
+
+So the current Amazon result is:
+
+- positive evidence for live-agent macro emergence
+- but still mostly at the search-entry layer
+- not yet evidence that long e-commerce action chunks naturally emerge under the present collection policy
+
+### Current External Collection Blocker
+
+I attempted one more small `amazon_cart` batch after the cart-family fix. That batch produced a clear external blocker rather than a browser/runtime one:
+
+- one cart task failed mid-run with `API error: 400 ... credit balance is too low to access the Anthropic API`
+- the next queued cart task failed immediately with the same low-credit error
+
+This is actually a useful stopping point, because it tells us:
+
+- the current extension/runtime stack is no longer the main reason collection stopped
+- the immediate blocker is Anthropic billing/credits
+
+So the current recommendation is:
+
+- pause additional paid collection until API credits are replenished
+- use the traces already gathered to refine analysis and reporting
+- resume with narrow Amazon cart/search batches once credits are available again
+
+At the moment, the health dashboard reads:
+
+- local recorded task folders: `19`
+- server completed tasks: `26`
+- server failed tasks: `7`
+- recorded/completed ratio: `0.7308`
+- usable/completed ratio: `0.5`
+
+Those aggregate ratios are still burdened by older broken builds. The newest post-fix Amazon runs are healthier than the historical average, but the dataset-wide dashboard still supports the same conservative conclusion:
+
+- do not scale paid collection yet
+- collect in tiny repeated families
+- prefer stable workflows and stable policies over raw volume
 - max macro length: `6`
 - held-out decision reduction: `41.67%`
 - compression ratio: `0.5833`
