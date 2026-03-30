@@ -1738,6 +1738,118 @@ This is probably the most important controller-side result so far, because it ex
 - not just whether a macro sounds relevant to the overall task
 - and that distinction is especially sharp once many macros share similar beginnings
 
+### Live WorkArena controller benchmark
+
+We then pushed one step closer to the target product setup:
+
+- real WorkArena browser episodes
+- named macro action space
+- controller chooses online between primitives and macros
+- macros expand back into real Playwright actions on the ServiceNow page
+- WorkArena validates the page after each direct action via `post_step(...)`
+
+This benchmark is implemented in:
+
+- `toolcalltokenization/workarena_benchmark.py`
+- `scripts/run_workarena_live_policy_benchmark.py`
+
+The key methodological change here is important:
+
+- earlier WorkArena selector numbers were **replay-time**
+- these new numbers are **live browser execution**
+
+We also added a true **live primitive baseline** so the time comparison is fair.
+
+Current live WorkArena results on the same held-out service-catalog slice:
+
+- live primitive baseline:
+  - `28 -> 28`
+  - `100%` success
+  - `153.69s` browser time
+- live oracle macro controller:
+  - `28 -> 10`
+  - `64.29%` decision reduction
+  - `100%` success
+  - `153.70s` browser time
+  - `163.70s` total time under `1s` decision latency
+- live learned controller:
+  - `28 -> 18`
+  - `35.71%` decision reduction
+  - `100%` success
+  - `157.70s` browser time
+  - `175.70s` total time under `1s` decision latency
+- live no-training LLM controller:
+  - `28 -> 27`
+  - `3.57%` decision reduction
+  - `100%` success
+  - `157.68s` browser time
+  - `24,710` total tokens
+  - `50%` macro success
+
+Figure:
+
+![Live WorkArena policy sweep](docs/figures/workarena_live_policy_sweep.svg)
+
+Important note:
+
+- some older per-run JSON fields such as `primitive_total_time_ms` still reference the earlier cheat-collected baseline
+- for fair live timing comparisons, use the **live primitive baseline** and the figure above instead
+
+This result answers an important version of the project question.
+
+**Does action chunking work for browser agents?**
+
+Yes, for **decision compression** and therefore potentially for:
+
+- model calls
+- token cost
+- planning depth
+- controller-side latency
+
+But not automatically for **raw browser wall-clock time**.
+
+The live WorkArena oracle is the clearest proof:
+
+- it recovers the full `64.29%` decision compression in the real browser loop
+- but browser time is basically unchanged versus live primitives
+
+Why? Because today’s macros are still only:
+
+- a different **controller interface**
+- expanding to the same underlying clicks, fills, and selects
+
+So they remove model decisions, but they do **not** remove the actual browser interactions or waits.
+
+That gives a much sharper end-to-end conclusion:
+
+1. **Macro discovery is real.**
+   Repeated browser workflows do exist and can be promoted into higher-level actions.
+
+2. **Macro execution is real.**
+   Those promoted actions can execute successfully in a real benchmark browser loop.
+
+3. **The first benefit is controller efficiency, not browser acceleration.**
+   If model latency dominates, macro actions help a lot.
+   If browser latency dominates, raw wall-clock speed barely changes unless macro execution also becomes more optimized than the primitive expansion.
+
+4. **No-training LLM choice is still not strong enough on WorkArena.**
+   The live LLM controller stayed near primitive behavior:
+   - only `1` net decision saved
+   - only `2` macro attempts
+   - `1` failed macro call
+
+5. **A small learned chooser is already useful.**
+   The learned controller preserved `100%` success and still saved `35.71%` of decisions live.
+
+This is probably the strongest current project conclusion:
+
+- the pipeline **does** work as an efficiency layer for browser agents
+- but to get big end-to-end wins, we need to separate:
+  - **decision compression**
+  - from **browser interaction compression**
+
+Right now we are strong on the first and weak on the second.
+
 ### Savings and replay metrics
 
 We now have two small evaluation scripts:

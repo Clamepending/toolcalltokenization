@@ -2,8 +2,11 @@ import unittest
 
 from toolcalltokenization.workarena_benchmark import (
     choose_target_label,
+    is_machine_label,
     normalize_target_role,
     stringify_action_value,
+    target_hints,
+    workarena_observation_text,
     workarena_task_name,
     workarena_trace_row,
 )
@@ -55,6 +58,32 @@ class WorkArenaBenchmarkTests(unittest.TestCase):
         self.assertEqual(row["website_task_family"], "servicenow::service catalog")
         self.assertEqual(row["target_role"], "button")
         self.assertEqual(row["target_label"], "Order Now")
+
+    def test_target_hints_prefers_selector_then_label_without_duplicates(self):
+        row = {"selector": "IO:abc123", "target_label": "IO:abc123"}
+        self.assertEqual(target_hints(row), ["IO:abc123"])
+
+    def test_is_machine_label_detects_servicenow_ids(self):
+        self.assertTrue(is_machine_label("IO:f3776ac9"))
+        self.assertTrue(is_machine_label("ni.IO:abc_label"))
+        self.assertFalse(is_machine_label("Order Now"))
+
+    def test_workarena_observation_text_filters_named_interactive_nodes(self):
+        obs = {
+            "url": "https://example.com/catalog",
+            "axtree_object": {
+                "nodes": [
+                    {"role": {"value": "link"}, "name": {"value": "Hardware"}},
+                    {"role": {"value": "button"}, "name": {"value": "Order Now"}},
+                    {"role": {"value": "generic"}, "name": {"value": "ignored"}},
+                ]
+            },
+        }
+        text = workarena_observation_text(obs, max_named_nodes=5)
+        self.assertIn("https://example.com/catalog", text)
+        self.assertIn("link:Hardware", text)
+        self.assertIn("button:Order Now", text)
+        self.assertNotIn("ignored", text)
 
 
 if __name__ == "__main__":

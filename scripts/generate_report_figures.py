@@ -40,6 +40,10 @@ def build_summary() -> dict:
     workarena_selector_semantic_guard = load_json(ROOT / "outputs" / "workarena_service_catalog_v1_semantic_guard_selector_v2.json")
     workarena_selector_semantic_noguard = load_json(ROOT / "outputs" / "workarena_service_catalog_v1_semantic_noguard_selector_v2.json")
     workarena_selector_learned = load_json(ROOT / "outputs" / "workarena_service_catalog_v1_learned_noguard_selector_v2_e20.json")
+    workarena_live_primitive = load_json(ROOT / "outputs" / "workarena_service_catalog_v1_primitive_live_v1_live_policy_benchmark.json")
+    workarena_live_oracle = load_json(ROOT / "outputs" / "workarena_service_catalog_v1_oracle_live_v3_live_policy_benchmark.json")
+    workarena_live_learned = load_json(ROOT / "outputs" / "workarena_service_catalog_v1_learned_live_v1_live_policy_benchmark.json")
+    workarena_live_llm = load_json(ROOT / "outputs" / "workarena_service_catalog_v1_llm_live_v1_live_policy_benchmark.json")
     mind2web_selector_oracle = load_json(ROOT / "outputs" / "mind2web_site_task_family_oracle_selector.json")
     mind2web_selector_learned = load_json(ROOT / "outputs" / "mind2web_site_task_family_learned_noguard_selector.json")
     miniwob_local_oracle = load_json(ROOT / "outputs" / "miniwob_live_v3_policy_oracle_v2_macro_policy_benchmark.json")
@@ -110,6 +114,10 @@ def build_summary() -> dict:
             "workarena_selector_learned": workarena_selector_learned["summary"],
             "workarena_selector_llm_guard": workarena_selector_llm_guard["summary"],
             "workarena_selector_llm_guard_v2": workarena_selector_llm_guard_v2["summary"],
+            "workarena_live_primitive": workarena_live_primitive["summary"],
+            "workarena_live_oracle": workarena_live_oracle["summary"],
+            "workarena_live_learned": workarena_live_learned["summary"],
+            "workarena_live_llm": workarena_live_llm["summary"],
             "miniwob_stable_replay_upper_bound": miniwob_replay["summary"],
             "miniwob_local_oracle": miniwob_local_oracle["summary"],
             "miniwob_global_exact": miniwob_global_exact["summary"],
@@ -134,6 +142,12 @@ def build_summary() -> dict:
             {"label": "LLM + guard", **workarena_selector_llm_guard["summary"]},
             {"label": "Semantic + guard", **workarena_selector_semantic_guard["summary"]},
             {"label": "Semantic no guard", **workarena_selector_semantic_noguard["summary"]},
+        ],
+        "workarena_live_policy_sweep": [
+            {"label": "Live primitive", **workarena_live_primitive["summary"]},
+            {"label": "Live oracle", **workarena_live_oracle["summary"]},
+            {"label": "Live learned", **workarena_live_learned["summary"]},
+            {"label": "Live LLM", **workarena_live_llm["summary"]},
         ],
         "global_trigger_sweep": [
             {"label": "Global exact", **miniwob_global_exact["summary"]},
@@ -379,6 +393,61 @@ def plot_workarena_selector_sweep(summary: dict) -> Path:
     return output
 
 
+def plot_workarena_live_policy_sweep(summary: dict) -> Path:
+    sweep = summary["workarena_live_policy_sweep"]
+    primitive = sweep[0]
+    labels = [item["label"] for item in sweep]
+    reductions = [
+        0.0 if index == 0 else round((primitive["agent_decisions"] - item["agent_decisions"]) / primitive["agent_decisions"] * 100.0, 2)
+        for index, item in enumerate(sweep)
+    ]
+    total_time_deltas_s = [
+        0.0 if index == 0 else round((primitive["macro_total_time_ms"] - item["macro_total_time_ms"]) / 1000.0, 2)
+        for index, item in enumerate(sweep)
+    ]
+    browser_time_deltas_s = [
+        0.0 if index == 0 else round((primitive["browser_time_ms"] - item["browser_time_ms"]) / 1000.0, 2)
+        for index, item in enumerate(sweep)
+    ]
+
+    fig, axes = plt.subplots(2, 1, figsize=(10.3, 7.4), sharex=True, gridspec_kw={"height_ratios": [1.8, 1.8]})
+    colors = ["#9aa0a6", "#6a994e", "#5a189a", "#457b9d"]
+
+    bars = axes[0].bar(labels, reductions, color=colors)
+    axes[0].set_ylabel("Decision Reduction Vs\nLive Primitive (%)")
+    axes[0].set_title("Live WorkArena: Macros Cut Agent Decisions, But Barely Change Raw Browser Time")
+    axes[0].set_ylim(0, max(reductions) * 1.25 if max(reductions) > 0 else 1)
+    axes[0].grid(axis="y", alpha=0.25)
+    for bar, value in zip(bars, reductions):
+        axes[0].text(bar.get_x() + bar.get_width() / 2, value + 1.0, f"{value:.1f}%", ha="center", va="bottom")
+
+    axes[1].bar(labels, total_time_deltas_s, color="#f4a261", alpha=0.85, label="Total time delta (1s/decision)")
+    axes[1].set_ylabel("Seconds Vs Live Primitive")
+    axes[1].grid(axis="y", alpha=0.25)
+    twin = axes[1].twinx()
+    twin.plot(labels, browser_time_deltas_s, color="#264653", marker="o", linewidth=2, label="Browser time delta")
+    twin.set_ylabel("Browser Time Delta (s)")
+    ymin = min(min(total_time_deltas_s), min(browser_time_deltas_s), 0.0) - 5.0
+    ymax = max(max(total_time_deltas_s), max(browser_time_deltas_s), 0.0) + 5.0
+    axes[1].set_ylim(ymin, ymax)
+    twin.set_ylim(ymin, ymax)
+    for idx, value in enumerate(total_time_deltas_s):
+        offset = 1.0 if value >= 0 else -1.4
+        va = "bottom" if value >= 0 else "top"
+        axes[1].text(idx, value + offset, f"{value:.1f}s", ha="center", va=va, color="#9c4f17", fontsize=9)
+    for idx, value in enumerate(browser_time_deltas_s):
+        twin.text(idx, value + (0.8 if value >= 0 else -0.8), f"{value:.1f}s", ha="center", va="bottom" if value >= 0 else "top", color="#264653", fontsize=9)
+
+    axes[0].text(1, reductions[1] + 3.0, "Same clicks/fills,\njust fewer model turns", ha="center", va="bottom", fontsize=9, color="#386641")
+    axes[1].text(1, total_time_deltas_s[1] + 2.0, "Time gain comes from fewer\ndecisions, not faster browsing", ha="center", va="bottom", fontsize=9, color="#9c4f17")
+    axes[1].tick_params(axis="x", rotation=12)
+    fig.tight_layout()
+    output = DOCS_FIGURES / "workarena_live_policy_sweep.svg"
+    fig.savefig(output, bbox_inches="tight")
+    plt.close(fig)
+    return output
+
+
 def plot_global_sweep(summary: dict) -> Path:
     sweep = summary["global_trigger_sweep"]
     labels = [item["label"] for item in sweep]
@@ -587,6 +656,7 @@ def main() -> None:
         "mind2web_hierarchy": str(plot_mind2web_hierarchy(summary)),
         "workarena_service_catalog": str(plot_workarena_service_catalog(summary)),
         "workarena_selector_sweep": str(plot_workarena_selector_sweep(summary)),
+        "workarena_live_policy_sweep": str(plot_workarena_live_policy_sweep(summary)),
         "global_sweep": str(plot_global_sweep(summary)),
         "failure_attribution": str(plot_failure_attribution(summary)),
         "semantic_policy_sweep": str(plot_semantic_policy_sweep(summary)),
