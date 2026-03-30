@@ -3089,21 +3089,49 @@ I added an Amazon-focused collection study and learning-curve figure:
 - `outputs/ottoauth_amazon_study.json`
 - `docs/figures/ottoauth_amazon_learning_curves.svg`
 
-The current study is still based on the same `3` locally recorded Amazon episodes, so it should be read as an ingestion sanity check rather than a real e-commerce result.
+The current study is now based on `4` usable Amazon episodes with canonical tool-call sequences, drawn from `6` local Amazon task folders:
+
+- `2` short Amazon checkout/error runs
+- `2` successful Amazon search/product extraction runs
+- `2` additional local Amazon folders are still only partial start-of-run artifacts, so they do not yet contribute canonical tool sequences
+
+That is enough for a first real curve, but still not enough for anything like `checkout(address)` or `order_product(...)`.
 
 Current Amazon curve:
 
 - held-out episodes fixed at `2`
 - `0` train Amazon traces: `0%` decision reduction
-- `1` train Amazon trace: `14.29%` decision reduction
+- `1` train Amazon trace: `6.67%` decision reduction
+- `2` train Amazon traces: `6.67%` decision reduction
 - promoted macros: `1`
 - max macro length: `2`
+- trigger precision: `0.5`
 
 That single promoted Amazon macro is only:
 
 - `COMPUTER|role=screenshot -> NAVIGATE|use=B01`
 
-So this is not yet evidence for something meaningful like `search_product(query)`, `add_to_cart()`, or `checkout(address)`. It is just the common prefix of every current run.
+So this is not yet evidence for something meaningful like `search_product(query)`, `add_to_cart()`, or `checkout(address)`. It is still just the common prefix of every current run.
+
+The important Amazon-specific insight is now more precise:
+
+1. We do have multiple real Amazon tool traces from the production-style agent.
+2. Those traces are not yet overlapping in the right way to produce meaningful macros.
+3. The main reason is not only data quantity, but also **strategy variance**.
+
+For example, the two successful Amazon search traces currently follow noticeably different tool policies:
+
+- one uses a mostly structural path like `read_page -> find -> form_input -> key -> read_page -> find`
+- another mixes `read_page`, `find`, and repeated `javascript_tool` probes to extract the first result and price
+
+Semantically they are both "search Amazon, open a plausible first result, read the price", but at the tool-call level they are much less aligned than they should be. That directly suppresses macro discovery.
+
+So the current Amazon learning curve is telling us two things at once:
+
+- we still need more repeated episodes
+- we also need **more policy consistency** if we want larger Amazon macros to emerge from production-agent traces
+
+In other words, "more data" alone is not enough if the agent solves the same task with different tool strategies each time.
 
 ### Current Amazon bottleneck
 
@@ -3111,11 +3139,11 @@ The important result is not the tiny local compression number. It is the mismatc
 
 At the time of this snapshot:
 
-- local recorded task count: `3`
-- server completed task count: `10`
+- local recorded task count: `6`
+- server completed task count: `14`
 - server failed task count: `2`
-- missing completed local recordings: `9`
-- missing completed Amazon recordings: `5`
+- missing completed local recordings: `11`
+- missing completed Amazon recordings: `7`
 
 Those missing completed Amazon traces already include tasks like:
 
@@ -3126,7 +3154,24 @@ Those missing completed Amazon traces already include tasks like:
 
 So the current lack of an Amazon macro is **not** because the production agent cannot do interesting Amazon work. It is because the deployed recorder path did not persist those traces locally.
 
-That means the next meaningful Amazon study will happen immediately after the refreshed extension build is running with a writable recording folder again. The collection campaign is already queued and proven to execute server-side.
+There is also a second live collection issue now visible in the queue:
+
+- some Amazon tasks remain in `delivered` state for long periods instead of completing and writing a final trace
+- some local Amazon folders remain in `running` state with only `task_received`, so they are not yet usable for macro mining
+
+So the current Amazon bottleneck is a combination of:
+
+1. incomplete local trace persistence
+2. long-running delivered tasks
+3. mixed workflow families inside one site bucket
+4. inconsistent tool strategies across semantically similar Amazon tasks
+
+That means the next meaningful Amazon study should use:
+
+- a healthier recorder path
+- fewer mixed task families per batch
+- repeated same-family prompts like `amazon_search` only or `amazon_cart` only
+- ideally a constrained action set that discourages ad hoc `javascript_tool` fallbacks when a stable structural action is available
 
 In practice, this means the next high-value move for real-agent data collection is:
 
