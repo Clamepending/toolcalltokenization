@@ -3733,7 +3733,7 @@ So the next meaningful Amazon campaign should remain narrow and cheap:
 To make the live-agent traces easy to hand to collaborators, the repo now includes a sanitized Hugging Face-style export flow:
 
 - export script: `scripts/export_ottoauth_hf_dataset.py`
-- default snapshot location: `hf_datasets/ottoauth_local_agent_snapshot/`
+- published dataset: `clamepending/ottoauth-local-agent-snapshot`
 
 The snapshot layout separates:
 
@@ -3752,4 +3752,4 @@ In this layout:
 - `manifests` means the exact queue payloads used to create the traces
 - the Amazon study is included as a convenience artifact for reproducing the current learning-curve claim, not because it is required for the underlying dataset
 
-The current snapshot has been checked for obvious prompt-level addresses and local absolute paths, and it reproduces the Amazon curve directly from `hf_datasets/ottoauth_local_agent_snapshot/processed/canonical_trace.jsonl`.
+The current snapshot has been checked for obvious prompt-level addresses and local absolute paths, and it reproduces the Amazon curve directly after downloading `processed/canonical_trace.jsonl` from the public HF dataset.

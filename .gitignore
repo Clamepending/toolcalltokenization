@@ -6,3 +6,5 @@ __pycache__/
 outputs/
 data/local/
 data/ottoauth/
+
+hf_datasets/ottoauth_local_agent_snapshot/

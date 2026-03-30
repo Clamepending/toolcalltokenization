@@ -14,7 +14,18 @@ If you only want to reproduce the Amazon OttoAuth graph, this is the shortest pa
 ```bash
 git clone https://github.com/Clamepending/toolcalltokenization.git
 cd toolcalltokenization
-git checkout 75d20a1
+git checkout c8d3a93
+
+python3 -m pip install -U huggingface_hub
+python3 - <<'PY'
+from huggingface_hub import snapshot_download
+snapshot_download(
+    repo_id="clamepending/ottoauth-local-agent-snapshot",
+    repo_type="dataset",
+    local_dir="hf_datasets/ottoauth_local_agent_snapshot",
+    local_dir_use_symlinks=False,
+)
+PY
 
 python3 scripts/run_ottoauth_amazon_study.py \
   --input hf_datasets/ottoauth_local_agent_snapshot/processed/canonical_trace.jsonl \
@@ -25,7 +36,7 @@ python3 scripts/generate_ottoauth_amazon_figures.py \
   --output /tmp/ottoauth_amazon_learning_curves.svg
 ```
 
-That reproduces the current Amazon learning-curve figure from the packaged snapshot already checked into the repo.
+That reproduces the current Amazon learning-curve figure from the public HF dataset snapshot.
 
 ## Focus
 
@@ -323,6 +334,10 @@ python3 scripts/export_ottoauth_hf_dataset.py \
   --output-dir hf_datasets/ottoauth_local_agent_snapshot
 ```
 
+Published dataset:
+
+- [clamepending/ottoauth-local-agent-snapshot](https://huggingface.co/datasets/clamepending/ottoauth-local-agent-snapshot)
+
 This writes:
 
 - `hf_datasets/ottoauth_local_agent_snapshot/raw_traces/`
@@ -342,6 +357,17 @@ The snapshot includes:
 To re-run the Amazon study from the snapshot:
 
 ```bash
+python3 -m pip install -U huggingface_hub
+python3 - <<'PY'
+from huggingface_hub import snapshot_download
+snapshot_download(
+    repo_id="clamepending/ottoauth-local-agent-snapshot",
+    repo_type="dataset",
+    local_dir="hf_datasets/ottoauth_local_agent_snapshot",
+    local_dir_use_symlinks=False,
+)
+PY
+
 python3 scripts/run_ottoauth_amazon_study.py \
   --input hf_datasets/ottoauth_local_agent_snapshot/processed/canonical_trace.jsonl \
   --output /tmp/ottoauth_amazon_study.json
