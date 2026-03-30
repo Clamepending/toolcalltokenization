@@ -3561,8 +3561,6 @@ Those aggregate ratios are still burdened by older broken builds. The newest pos
 - do not scale paid collection yet
 - collect in tiny repeated families
 - prefer stable workflows and stable policies over raw volume
-FORM_INPUT|use=B03
-COMPUTER|role=key|use=B04
 ```
 
 This is effectively a first plausible `amazon_search(query)`-style macro. On the best held-out example episode:
