@@ -3487,16 +3487,16 @@ After tightening that heuristic, the Amazon study now exposes four curves:
 
 The current best points are now:
 
-- site-wide `amazon.com`: `26.67%` decision reduction, `2` promoted macros
+- site-wide `amazon.com`: `22.64%` decision reduction, `2` promoted macros
 - `amazon.com::search`: `41.67%` decision reduction, `1` promoted macro
-- `amazon.com::cart`: `22.22%` decision reduction, `1` promoted macro
-- `amazon.com::checkout`: `0%` decision reduction, `0` promoted macros
+- `amazon.com::cart`: `18.87%` decision reduction, `1` promoted macro
+- `amazon.com::checkout`: `50%` decision reduction, `1` promoted macro, but on only `2` very short episodes and therefore not yet meaningful
 
 So the Amazon story is now more realistic:
 
 - search is genuinely compressible on the live production agent
 - cart is beginning to compress too
-- checkout still has too little clean repeated data to surface anything reliable
+- checkout is still too sparse and trivial to support a serious conclusion
 
 ### Why `add_to_cart()` Still Has Not Emerged
 
@@ -3561,18 +3561,6 @@ Those aggregate ratios are still burdened by older broken builds. The newest pos
 - do not scale paid collection yet
 - collect in tiny repeated families
 - prefer stable workflows and stable policies over raw volume
-- max macro length: `6`
-- held-out decision reduction: `41.67%`
-- compression ratio: `0.5833`
-- prefix-2 trigger precision: `1.0`
-
-The strongest Amazon macro is now a real search-entry routine rather than a trivial bootstrapping prefix:
-
-```text
-COMPUTER|role=screenshot
-NAVIGATE|use=B01
-READ_PAGE
-FIND|use=B02
 FORM_INPUT|use=B03
 COMPUTER|role=key|use=B04
 ```
