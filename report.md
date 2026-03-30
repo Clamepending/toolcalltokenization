@@ -3073,14 +3073,60 @@ That means the current bottleneck for this collection path is:
 The current audit is now explicit:
 
 - local recorded task count: `3`
-- server completed task count: `6`
+- server completed task count: `10`
 - server failed task count: `2`
-- missing completed local recordings: `5`
+- missing completed local recordings: `9`
 - missing failed local recordings: `2`
 
 The audit artifact is:
 
 - `outputs/ottoauth_collection_audit.json`
+
+### Amazon-specific OttoAuth snapshot
+
+I added an Amazon-focused collection study and learning-curve figure:
+
+- `outputs/ottoauth_amazon_study.json`
+- `docs/figures/ottoauth_amazon_learning_curves.svg`
+
+The current study is still based on the same `3` locally recorded Amazon episodes, so it should be read as an ingestion sanity check rather than a real e-commerce result.
+
+Current Amazon curve:
+
+- held-out episodes fixed at `2`
+- `0` train Amazon traces: `0%` decision reduction
+- `1` train Amazon trace: `14.29%` decision reduction
+- promoted macros: `1`
+- max macro length: `2`
+
+That single promoted Amazon macro is only:
+
+- `COMPUTER|role=screenshot -> NAVIGATE|use=B01`
+
+So this is not yet evidence for something meaningful like `search_product(query)`, `add_to_cart()`, or `checkout(address)`. It is just the common prefix of every current run.
+
+### Current Amazon bottleneck
+
+The important result is not the tiny local compression number. It is the mismatch between server completions and local trace persistence.
+
+At the time of this snapshot:
+
+- local recorded task count: `3`
+- server completed task count: `10`
+- server failed task count: `2`
+- missing completed local recordings: `9`
+- missing completed Amazon recordings: `5`
+
+Those missing completed Amazon traces already include tasks like:
+
+- search for `Logitech MX Master 3S`
+- search for `black crew socks men` and add to cart
+- search for `white ankle socks women` and add to cart
+- search for `Apple AirPods Pro 2`
+
+So the current lack of an Amazon macro is **not** because the production agent cannot do interesting Amazon work. It is because the deployed recorder path did not persist those traces locally.
+
+That means the next meaningful Amazon study will happen immediately after the refreshed extension build is running with a writable recording folder again. The collection campaign is already queued and proven to execute server-side.
 
 In practice, this means the next high-value move for real-agent data collection is:
 
