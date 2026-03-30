@@ -3212,3 +3212,77 @@ The remaining question is now purely empirical:
 **How many repeated episodes per site-family are needed before the production agent's own tool vocabulary starts to compress in a meaningful way?**
 
 The current repo is now set up to answer that once we accumulate more OttoAuth traces.
+
+### OttoAuth Collection Health Update
+
+I added a lightweight collection-health dashboard so we can decide whether it is worth spending more VLM budget on live OttoAuth campaigns:
+
+- refresh script: `scripts/refresh_ottoauth_dashboard.py`
+- health summary: `outputs/ottoauth_collection_health.json`
+- health figure: `docs/figures/ottoauth_collection_health.svg`
+
+Current health snapshot after refreshing the dashboard:
+
+- local trace folders: `6`
+- usable local trace folders: `6`
+- canonical Amazon episodes: `6`
+- server completed tasks for `browser-agent-1`: `17`
+- server failed tasks: `2`
+- local recorded vs server completed: `0.3529`
+- missing completed recordings: `13`
+- missing completed Amazon recordings: `9`
+
+So the traces that do land locally are now clean enough to mine, but recorder coverage is still too low for aggressive paid collection. The dashboard recommendation is therefore:
+
+`Pause expensive collection campaigns until recorder coverage improves; the current trace loss rate is too high.`
+
+This is the main operational blocker right now. The method is not blocked by trace format quality anymore. It is blocked by persistence coverage.
+
+### Updated Amazon Live-Agent Curve
+
+After re-ingesting the newest local Amazon traces, the real-agent Amazon study now has `6` canonical Amazon episodes:
+
+- study JSON: `outputs/ottoauth_amazon_study.json`
+- learning curve figure: `docs/figures/ottoauth_amazon_learning_curves.svg`
+
+The updated site-level curve is:
+
+- `0` train episodes, `2` held-out: `0%` decision reduction
+- `1` train episode, `2` held-out: `6.45%`
+- `2` train episodes, `2` held-out: `6.45%`
+- `3` train episodes, `2` held-out: `6.45%`
+- `4` train episodes, `2` held-out: `19.35%`
+
+At that best point:
+
+- promoted macros: `3`
+- parameterized promoted macros: `3`
+- average macro length: `3.0`
+- max macro length: `5`
+- held-out primitive steps: `31`
+- held-out steps saved: `6`
+- prefix-2 trigger precision: `0.5`
+
+The strongest promoted Amazon macro is now a real workflow prefix rather than just `screenshot -> navigate`:
+
+- `COMPUTER|role=screenshot -> NAVIGATE|use=B01 -> READ_PAGE -> FIND|use=B02 -> FORM_INPUT|use=B03`
+
+This is a meaningful improvement over the earlier trivial curve. It suggests that once the agent accumulates even a small number of structurally similar Amazon search traces, a `search_product(query)`-style macro starts to become plausible. What still does **not** emerge yet is anything like `add_to_cart()` or `checkout(address)`, because:
+
+- we do not yet have enough successful, repeated cart/checkout traces
+- the recorded Amazon tasks still mix search-only and cart-like behavior
+- tool policy variance is still high across semantically similar tasks
+
+### Current Recommendation
+
+The next safe move is:
+
+1. Keep the current recorder on, but do **not** launch a large paid batch yet.
+2. Use `python3 scripts/refresh_ottoauth_dashboard.py` after each small campaign.
+3. Only scale once local recorded vs server completed is consistently above about `0.8`.
+4. When collection resumes, keep it narrowly bucketed, for example:
+   - `amazon_search`
+   - `amazon_cart`
+   - `amazon_login`
+
+The Amazon curve is finally starting to move, but the recorder coverage issue is still the dominant cost bottleneck.
