@@ -1,3 +1,26 @@
+---
+pretty_name: OttoAuth Local Agent Snapshot
+language:
+- en
+license: other
+annotations_creators:
+- machine-generated
+language_creators:
+- machine-generated
+multilinguality:
+- monolingual
+size_categories:
+- n<1K
+source_datasets:
+- original
+tags:
+- browser-agents
+- web-automation
+- tool-use
+- traces
+- macro-mining
+---
+
 # OttoAuth Local Agent Snapshot
 
 This folder is a Hugging Face-ready snapshot of the OttoAuth browser-agent traces used in the macro-mining experiments.
