@@ -3133,6 +3133,23 @@ So the current Amazon learning curve is telling us two things at once:
 
 In other words, "more data" alone is not enough if the agent solves the same task with different tool strategies each time.
 
+I also ran a small ablation on the current Amazon sample:
+
+- current Amazon sample size for this check: `5` usable Amazon episodes
+- `javascript_tool` appears heavily in only `1` of those episodes
+- within that episode, it accounts for `6 / 18` tool calls
+- across all `5` Amazon episodes, it is about `11%` of tool calls
+
+Most importantly, removing `javascript_tool` from the Amazon sample only changes held-out site-level decision reduction from about `5.26%` to `6.25%`.
+
+So `javascript_tool` is **not** the main blocker right now. The larger problem is still sparse repeated data plus strategy variance across semantically similar Amazon tasks.
+
+My current recommendation is:
+
+- do not panic about `javascript_tool`
+- do not make it the primary collection primitive
+- treat it as a fallback and keep collecting more structurally consistent search/cart runs
+
 ### Current Amazon bottleneck
 
 The important result is not the tiny local compression number. It is the mismatch between server completions and local trace persistence.
