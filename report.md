@@ -3437,3 +3437,119 @@ That change is in:
 - `chrome-extension/src/shared/constants.ts`
 
 This latest timeout hardening requires another extension refresh before it affects live collection.
+
+### Post-Refresh Server-Polling Validation
+
+The next refresh exposed the underlying recorder bug more clearly: a server-polled task could execute to completion without ever instantiating a local recorder if the sidepanel's in-memory recording flag had fallen out of sync with persisted Chrome storage.
+
+I patched `createTraceRecorder(...)` to consult persisted `chrome.storage.local` state directly at task start instead of trusting only the in-memory UI store. After that patch and refresh, the behavior changed in the way we wanted:
+
+- freshly queued server-polled Amazon tasks created local folders immediately
+- the tasks ran in the background tab group without stealing focus
+- the traces checkpointed while running
+- the tasks wrote final `completed` traces on success
+
+The newest three server-polled Amazon search tasks all behaved correctly end-to-end:
+
+- `mock_1774861116742_wbwxuy`
+- `mock_1774861212299_ql6407`
+- `mock_1774861212641_1kfnvv`
+
+So the collection story is now materially better:
+
+- the execution did happen even when it was not visible in the foreground UI
+- server-polled runs now persist locally again
+- queue handoff from one background task to the next is working
+
+There are still many older missing recordings from before this fix, so the historical coverage ratio is still dragged down. But the newest post-fix runs are finally healthy enough to treat as real study data rather than just infrastructure debugging.
+
+### Updated Amazon Live-Agent Result After Recorder Fix
+
+After refreshing the OttoAuth dashboard with the newly recorded Amazon traces, the Amazon study improved substantially.
+
+Current best Amazon point:
+
+- train episodes: `5`
+- held-out episodes: `2`
+- promoted macros: `1`
+- parameterized promoted macros: `1`
+- max macro length: `6`
+- held-out decision reduction: `41.67%`
+- compression ratio: `0.5833`
+- prefix-2 trigger precision: `1.0`
+
+The strongest Amazon macro is now a real search-entry routine rather than a trivial bootstrapping prefix:
+
+```text
+COMPUTER|role=screenshot
+NAVIGATE|use=B01
+READ_PAGE
+FIND|use=B02
+FORM_INPUT|use=B03
+COMPUTER|role=key|use=B04
+```
+
+This is effectively a first plausible `amazon_search(query)`-style macro. On the best held-out example episode:
+
+- primitive steps: `12`
+- compressed steps: `7`
+- macro hits: `1`
+
+before:
+
+```text
+COMPUTER|role=screenshot
+NAVIGATE|use=B01
+READ_PAGE
+FIND|use=B02
+FORM_INPUT|use=B03
+COMPUTER|role=key|use=B04
+FIND|use=B05
+COMPUTER|role=left_click
+READ_PAGE
+FIND|use=B06
+COMPUTER|role=left_click
+COMPUTER|role=wait
+```
+
+after:
+
+```text
+MACRO:M012
+FIND|use=B05
+COMPUTER|role=left_click
+READ_PAGE
+FIND|use=B06
+COMPUTER|role=left_click
+COMPUTER|role=wait
+```
+
+That is the first Amazon result in this live-agent study that looks genuinely promising rather than merely cosmetic.
+
+### Interpretation Of The Updated Amazon Curve
+
+The current Amazon data now says something more useful than before:
+
+1. The main bottleneck was partly infrastructure.
+   Before the recorder fix, successful server-polled tasks could disappear from the local corpus entirely.
+
+2. Once those traces land locally, a real same-site search macro does emerge.
+   The new length-`6` search-entry macro is exactly the kind of reusable low-argument routine we wanted to see first.
+
+3. The promising Amazon macros are still search-phase macros, not checkout macros.
+   We still do **not** yet have repeated local evidence for anything like `add_to_cart()` or `checkout(address)`.
+
+4. This strengthens the broader hypothesis.
+   Real production-agent traces can indeed move the curve once collection becomes reliable enough.
+
+The present Amazon ceiling is still obvious:
+
+- too many older missing recordings
+- too little repeated cart / checkout data
+- too much variation after the search step
+
+So the next meaningful Amazon campaign should remain narrow and cheap:
+
+- keep collecting `amazon_search` for a bit longer until the curve stabilizes
+- then add a separate `amazon_cart` campaign
+- only attempt `checkout`-style macro discovery after we have repeated add-to-cart traces landing reliably
