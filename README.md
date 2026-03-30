@@ -7,6 +7,26 @@ Small experiments for learning reusable browser-agent or tool-call action chunks
 - [Project plan](./report.md)
 - [Literature review](./browser-agent-tool-tokenization-report.md)
 
+## Fastest Reproduction
+
+If you only want to reproduce the Amazon OttoAuth graph, this is the shortest path:
+
+```bash
+git clone https://github.com/Clamepending/toolcalltokenization.git
+cd toolcalltokenization
+git checkout 75d20a1
+
+python3 scripts/run_ottoauth_amazon_study.py \
+  --input hf_datasets/ottoauth_local_agent_snapshot/processed/canonical_trace.jsonl \
+  --output /tmp/ottoauth_amazon_study.json
+
+python3 scripts/generate_ottoauth_amazon_figures.py \
+  --input /tmp/ottoauth_amazon_study.json \
+  --output /tmp/ottoauth_amazon_learning_curves.svg
+```
+
+That reproduces the current Amazon learning-curve figure from the packaged snapshot already checked into the repo.
+
 ## Focus
 
 This repo now has:

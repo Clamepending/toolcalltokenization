@@ -23,23 +23,21 @@ tags:
 
 # OttoAuth Local Agent Snapshot
 
-This folder is a Hugging Face-ready snapshot of the OttoAuth browser-agent traces used in the macro-mining experiments.
+This folder is a minimal Hugging Face-ready snapshot of the OttoAuth browser-agent traces used in the macro-mining experiments.
 
 ## What is included
 
 - `raw_traces/`: sanitized `task.json` / `trace.json` folders copied from the Chrome extension recorder
-- `processed/`: sanitized JSONL and summary outputs from the OttoAuth ingest pipeline
+- `processed/`: the single canonical JSONL used by the Amazon macro study
 - `manifests/`: the queued campaign specs that produced these traces
-- `analysis/`: small derived JSON artifacts used in the Amazon and collection-health writeups
-- `figures/`: the corresponding SVG plots
+- `analysis/`: the derived Amazon study JSON used for the current learning-curve claim
+- `figures/`: the Amazon learning-curve SVG
 - `metadata/export_summary.json`: snapshot counts and export metadata
 
 ## Folder meanings
 
 - `processed/canonical_trace.jsonl`
   - the normalized action sequence used by macro mining
-- `processed/raw_trace.jsonl`
-  - the flattened primitive tool-call rows before canonicalization
 - `manifests/`
   - reproducibility metadata showing exactly which task batches were queued
 - `analysis/ottoauth_amazon_study.json`
@@ -48,6 +46,12 @@ This folder is a Hugging Face-ready snapshot of the OttoAuth browser-agent trace
 ## Privacy note
 
 The export script sanitizes obvious addresses, phone numbers, and email-like strings in JSON and JSONL payloads. The goal is to make the snapshot shareable with collaborators without exposing prompt-specific address details.
+
+This snapshot is intentionally small. It keeps only the files needed to:
+
+- inspect the original raw trace folders
+- rerun the Amazon study from the canonical JSONL
+- compare the rerun figure against the bundled reference figure
 
 ## Reproducing the Amazon study
 
@@ -72,8 +76,7 @@ PY
 ## Snapshot summary
 
 - raw trace folders: 21
-- processed JSON files: 4
-- processed JSONL files: 2
+- processed JSONL files: 1
 - manifest files: 18
-- analysis files: 3
-- figure files: 2
+- analysis files: 1
+- figure files: 1

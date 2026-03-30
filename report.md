@@ -1,6 +1,106 @@
-# Project Plan
+# Browser Agent Action Chunking
 
 Date: 2026-03-28
+
+## Executive Summary
+
+This project asks a simple question:
+
+**Can we mine repeated browser-action chunks from traces, expose them as higher-level actions, and reduce agent decisions without hurting task success?**
+
+The current answer is:
+
+- **yes on dense repeated workflow families**
+- **weakly on broad heterogeneous web data**
+- **only if macro choice is structurally constrained or learned**
+
+The most important current results are:
+
+1. **Broad web data is coverage-limited.**
+   On public Mind2Web, the best current setting (`site+task-family -> site`) only achieves about `3.23%` overall decision reduction because usable macro coverage is still sparse.
+
+2. **Dense repeated families compress very well.**
+   On live MiniWoB, a learned controller reaches `60.0%` decision reduction. On WorkArena service-catalog, the replay upper bound and oracle selector both reach `64.29%`.
+
+3. **Macro discovery is not the main bottleneck anymore on dense families.**
+   The harder problem is now **selection quality**: when to call a macro instead of a primitive.
+
+4. **Semantic names alone are not enough.**
+   No-training LLM choice works only with a lightweight structural guard on MiniWoB, and remains weak on live WorkArena.
+
+5. **Real production-agent traces do start to yield useful macros.**
+   On live OttoAuth Amazon traces, `amazon.com::search` now reaches `41.67%` held-out decision reduction, while `amazon.com::cart` reaches `18.87%`. The first real macro to emerge is effectively an `amazon_search(query)` prefix, not yet `add_to_cart()` or `checkout(address)`.
+
+6. **This is mainly a control-plane optimization today.**
+   Macros reduce model decisions, token cost, and controller latency. They do **not** automatically reduce raw browser execution time, because a macro still expands to the same primitive browser actions.
+
+## Most Important Figures
+
+![Overall action chunking benchmark summary](docs/figures/action_chunking_overview.svg)
+
+Use this first. It is the clearest “one-chart” summary of where action chunking works and where it does not.
+
+![Mind2Web hierarchy sweep](docs/figures/mind2web_hierarchy_sweep.svg)
+
+Use this to understand the broad-web bottleneck: coverage and ambiguity dominate on heterogeneous public traces.
+
+![Semantic MiniWoB policy sweep](docs/figures/miniwob_semantic_policy_sweep.svg)
+
+Use this to understand the controller problem: semantic macros help only when paired with a lightweight structural guard.
+
+![Live WorkArena policy sweep](docs/figures/workarena_live_policy_sweep.svg)
+
+Use this as the strongest benchmark-site result. It shows that action chunking really does compress decisions in a real browser loop, even though browser-side wall clock remains mostly flat.
+
+![Amazon OttoAuth Learning Curves](docs/figures/ottoauth_amazon_learning_curves.svg)
+
+Use this as the first real production-agent collection result. It shows that same-site workflow reuse does start to emerge on live Amazon traces once recorder reliability improves.
+
+## Bottom-Line Conclusions
+
+- **Best regime:** repeated same-site workflow families such as MiniWoB task families, WorkArena service-catalog tasks, and likely future login/search/cart flows collected deliberately.
+- **Worst regime:** broad pooled web traces where workflow families are sparse and page-state ambiguity is high.
+- **Best current algorithmic recipe:** mine macros within site/workflow buckets, promote only held-out-useful chunks, expose them as named actions, and guard macro choice with either a cheap structural mask or a learned selector.
+- **What does not work well enough yet:** just handing a large global macro library to an LLM and hoping semantic names/descriptions are enough.
+- **What still blocks larger wins on real sites:** denser repeated traces, more policy consistency during collection, and stronger page-state-aware macro triggering.
+
+## Minimal Algorithm
+
+The current minimal algorithm that best matches the evidence is:
+
+1. Collect primitive browser traces.
+2. Canonicalize them into `dataflow_coarse`.
+3. Bucket traces by `website` or `website_task_family`.
+4. Mine repeated contiguous chunks.
+5. Promote only chunks that survive held-out replay.
+6. Expose promoted chunks as named macros alongside primitive actions.
+7. Use a structural guard or learned chooser to decide when to call them.
+8. Always keep primitive fallback.
+
+## Current Best Numbers
+
+- **Mind2Web best hierarchy:** `3.23%` overall decision reduction, with only `26.63%` held-out-step coverage.
+- **MiniWoB learned live controller:** `80 -> 32` decisions, `60.0%` reduction, `1.0` success.
+- **MiniWoB no-training LLM + guard:** `80 -> 43` decisions, `46.25%` reduction.
+- **WorkArena replay/oracle:** `28 -> 10` decisions, `64.29%` reduction.
+- **WorkArena learned live controller:** `28 -> 18` decisions, `35.71%` reduction, `1.0` success.
+- **WorkArena no-training LLM live controller:** `28 -> 27` decisions, `3.57%` reduction.
+- **OttoAuth Amazon site-wide:** `22.64%` best decision reduction.
+- **OttoAuth Amazon search:** `41.67%` best decision reduction.
+- **OttoAuth Amazon cart:** `18.87%` best decision reduction.
+
+## Current Interpretation
+
+The overall story is now fairly consistent:
+
+- action chunking is **real**
+- it is strongest when the workflow family is dense and repetitive
+- the first major bottleneck is **coverage** on broad web data
+- the second major bottleneck is **selection quality** on dense local action spaces
+- names and descriptions help, but structure still matters a lot
+- long e-commerce macros will likely require either denser repeated traces or composition of shorter reliable macros
+
+## Detailed Log
 
 ## Goal
 

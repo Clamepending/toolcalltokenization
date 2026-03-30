@@ -5,14 +5,13 @@
     "jsonl_files": 0
   },
   "processed": {
-    "json_files": 4,
-    "jsonl_files": 2
+    "jsonl_files": 1
   },
   "manifest_files": 18,
   "analysis": {
-    "json_files": 3
+    "json_files": 1
   },
-  "figure_files": 2,
+  "figure_files": 1,
   "source_paths": {
     "raw_root": "raw OttoAuth trace collection",
     "processed_root": "processed OttoAuth live collection outputs",

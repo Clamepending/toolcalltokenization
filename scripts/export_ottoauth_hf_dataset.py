@@ -125,6 +125,22 @@ def export_tree(src_root: Path, dst_root: Path) -> dict[str, int]:
     return counts
 
 
+def export_selected_json_files(src_root: Path, dst_root: Path, relative_paths: list[str]) -> dict[str, int]:
+    counts = {"json": 0, "jsonl": 0}
+    for relative_path in relative_paths:
+        src = src_root / relative_path
+        dst = dst_root / relative_path
+        if not src.is_file():
+            continue
+        if src.suffix == ".json":
+            export_json_file(src, dst)
+            counts["json"] += 1
+        elif src.suffix == ".jsonl":
+            export_jsonl_file(src, dst)
+            counts["jsonl"] += 1
+    return counts
+
+
 def copy_file(src: Path, dst: Path) -> None:
     dst.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(src, dst)
@@ -158,23 +174,21 @@ tags:
 
 # OttoAuth Local Agent Snapshot
 
-This folder is a Hugging Face-ready snapshot of the OttoAuth browser-agent traces used in the macro-mining experiments.
+This folder is a minimal Hugging Face-ready snapshot of the OttoAuth browser-agent traces used in the macro-mining experiments.
 
 ## What is included
 
 - `raw_traces/`: sanitized `task.json` / `trace.json` folders copied from the Chrome extension recorder
-- `processed/`: sanitized JSONL and summary outputs from the OttoAuth ingest pipeline
+- `processed/`: the single canonical JSONL used by the Amazon macro study
 - `manifests/`: the queued campaign specs that produced these traces
-- `analysis/`: small derived JSON artifacts used in the Amazon and collection-health writeups
-- `figures/`: the corresponding SVG plots
+- `analysis/`: the derived Amazon study JSON used for the current learning-curve claim
+- `figures/`: the Amazon learning-curve SVG
 - `metadata/export_summary.json`: snapshot counts and export metadata
 
 ## Folder meanings
 
 - `processed/canonical_trace.jsonl`
   - the normalized action sequence used by macro mining
-- `processed/raw_trace.jsonl`
-  - the flattened primitive tool-call rows before canonicalization
 - `manifests/`
   - reproducibility metadata showing exactly which task batches were queued
 - `analysis/ottoauth_amazon_study.json`
@@ -183,6 +197,12 @@ This folder is a Hugging Face-ready snapshot of the OttoAuth browser-agent trace
 ## Privacy note
 
 The export script sanitizes obvious addresses, phone numbers, and email-like strings in JSON and JSONL payloads. The goal is to make the snapshot shareable with collaborators without exposing prompt-specific address details.
+
+This snapshot is intentionally small. It keeps only the files needed to:
+
+- inspect the original raw trace folders
+- rerun the Amazon study from the canonical JSONL
+- compare the rerun figure against the bundled reference figure
 
 ## Reproducing the Amazon study
 
@@ -207,7 +227,6 @@ PY
 ## Snapshot summary
 
 - raw trace folders: {export_summary["raw_trace_folders"]}
-- processed JSON files: {processed["json_files"]}
 - processed JSONL files: {processed["jsonl_files"]}
 - manifest files: {export_summary["manifest_files"]}
 - analysis files: {analysis["json_files"]}
@@ -227,18 +246,22 @@ def main() -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     raw_counts = export_tree(raw_root, output_dir / "raw_traces")
-    processed_counts = export_tree(processed_root, output_dir / "processed")
+    processed_counts = export_selected_json_files(
+        processed_root,
+        output_dir / "processed",
+        ["canonical_trace.jsonl"],
+    )
     manifest_counts = export_tree(manifests_root, output_dir / "manifests")
 
     analysis_count = 0
-    for item in args.analysis_files:
+    for item in args.analysis_files[:1]:
         src = Path(item)
         if src.is_file():
             export_json_file(src, output_dir / "analysis" / src.name)
             analysis_count += 1
 
     figure_count = 0
-    for item in args.figure_files:
+    for item in args.figure_files[:1]:
         src = Path(item)
         if src.is_file():
             copy_file(src, output_dir / "figures" / src.name)
@@ -252,7 +275,6 @@ def main() -> None:
             "jsonl_files": raw_counts["jsonl"],
         },
         "processed": {
-            "json_files": processed_counts["json"],
             "jsonl_files": processed_counts["jsonl"],
         },
         "manifest_files": manifest_counts["json"],
