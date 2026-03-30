@@ -3286,3 +3286,80 @@ The next safe move is:
    - `amazon_login`
 
 The Amazon curve is finally starting to move, but the recorder coverage issue is still the dominant cost bottleneck.
+
+### Small Follow-Up Amazon Batch
+
+I ran one more cautious live collection batch after the dashboard work:
+
+- campaign: `amazon_search`
+- queued tasks: `2`
+- newly completed clean local traces: `1`
+- newly started local traces still stuck at `task_received`: `1`
+
+This was intentionally small because VLM calls are expensive and the recorder pipeline is still not healthy enough to justify a larger batch.
+
+The important operational outcome is mixed:
+
+- local trace folders increased from `6` to `8`
+- usable local traces increased from `6` to `7`
+- server completed tasks increased from `17` to `18`
+- local recorded vs server completed improved from `0.3529` to `0.4444`
+- usable local vs server completed improved from `0.3529` to `0.3889`
+
+So collection health improved somewhat, but it is still far below the threshold where scaling looks cost-efficient.
+
+### Updated Amazon Interpretation
+
+After re-ingesting with the one newly completed Amazon search trace, the Amazon study now has `7` canonical episodes:
+
+- study JSON: `outputs/ottoauth_amazon_study.json`
+- learning curve figure: `docs/figures/ottoauth_amazon_learning_curves.svg`
+
+The surprising part is that the best held-out Amazon compression **dropped**:
+
+- previous best at `6` episodes: `19.35%`
+- updated best at `7` episodes: `5.71%`
+
+Current best point:
+
+- held-out primitive steps: `35`
+- held-out steps saved: `2`
+- promoted macros: `2`
+- max macro length: `2`
+- prefix-1 and prefix-2 trigger precision: `0.6667`
+
+Current promoted Amazon macros:
+
+- `READ_PAGE -> FIND`
+- `COMPUTER|role=key -> COMPUTER|role=wait`
+
+This is actually an informative result rather than a failure of the study.
+
+The new Amazon search trace is much longer (`24` primitive tool calls) and follows a noticeably different strategy from the earlier search/product traces. Instead of staying close to the earlier pattern:
+
+- `screenshot -> navigate -> read_page -> find -> form_input -> key -> wait -> ...`
+
+the new trace includes a larger amount of cursor-keyboard interaction before it eventually falls back to:
+
+- `read_page -> find -> form_input -> ...`
+
+In other words, the added trace increased sample size but **reduced structural consistency**. That is exactly why the macro curve moved in the wrong direction. The result strengthens the current causal story:
+
+- more data helps only if the agent solves the same workflow in a similar way
+- heterogeneous strategies within one site bucket can suppress macro emergence even as episode count rises
+
+### Current Live Collection Bottleneck
+
+At this point the main blocker is no longer trace format quality. It is collection reliability and policy stability:
+
+1. recorder coverage is still too low for large paid batches
+2. one of the two newest Amazon tasks is currently frozen at `task_received`
+3. the newest successful Amazon search trace used a different low-level strategy and reduced macro reuse
+
+So the safest current recommendation remains:
+
+- keep batches very small
+- prefer one narrow family such as `amazon_search`
+- only scale once both of these are true:
+  - local/server recording coverage is comfortably above `0.8`
+  - repeated episodes within the family show stable action patterns rather than diverging tool strategies
