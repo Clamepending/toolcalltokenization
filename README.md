@@ -141,6 +141,21 @@ MINIWOB_URL="file:///Users/mark/Desktop/projects/toolcalltokenization/data/local
   --headless \
   --policy-mode trigger_prefix \
   --trigger-prefix-len 1
+
+python3 scripts/run_macro_data_scaling_study.py \
+  --input outputs/mind2web_full_train_dataflow_coarse/canonical_trace.jsonl \
+  --output outputs/mind2web_data_scaling_study.json
+
+python3 scripts/export_trace_case_study.py \
+  --input outputs/mind2web_full_train_dataflow_coarse/canonical_trace.jsonl \
+  --output outputs/mind2web_trace_case_studies.json \
+  --group amazon \
+  --group amazon::cart \
+  --group united::flight
+
+python3 scripts/build_macro_store.py \
+  --input outputs/mind2web_full_train_dataflow_coarse/canonical_trace.jsonl \
+  --output outputs/mind2web_bucketed_macro_store.json
 ```
 
 To sweep action representations instead of using just one canonical form, rerun
@@ -177,6 +192,9 @@ To measure utility instead of just discovery:
 - use `simulate_macro_agent.py` to estimate what a macro-aware agent would save once failed macro attempts and primitive fallback are included
 - use `run_playwright_action.py` to execute one primitive or macro action in a real browser with Playwright tracing
 - use `run_miniwob_macro_policy_benchmark.py` to replay held-out MiniWoB episodes live with macro selection, primitive fallback, and decision-side timing estimates
+- use `run_macro_data_scaling_study.py` to measure how many completed runs per bucket are needed before macros become useful
+- use `export_trace_case_study.py` to export before/after compressed traces for concrete buckets like `amazon` or `united::flight`
+- use `build_macro_store.py` to emit a deployable bucketed JSON registry with shadow-eval statistics and live-ready flags
 
 The current savings numbers are still **decision-side estimates**, not real browser wall-clock timings. Real wall-clock measurements will need a controlled online benchmark.
 

@@ -2020,6 +2020,183 @@ Some site-local parameterized replay rates are already much stronger than the gl
 
 These are still small-scale and should be treated as exploratory, but they are exactly the sort of signal we want if the end goal is reusable functions.
 
+### Data Scaling Study: Runs Per Bucket vs Compression
+
+To make the deployment question concrete, we ran a new scaling study over accumulated traces.
+
+Artifacts:
+
+- `outputs/mind2web_data_scaling_study.json`
+- `outputs/workarena_service_catalog_data_scaling.json`
+- figure: `docs/figures/mind2web_data_scaling.svg`
+- figure: `docs/figures/workarena_data_scaling.svg`
+
+Method:
+
+- fix a held-out suffix of episodes per bucket
+- grow the train pool from `2` episodes upward
+- mine and promote macros at each train size using the same held-out-safe promotion logic
+- measure held-out decision reduction after promotion
+
+The cleanest broad-web result is that the required data volume depends heavily on the cohort.
+
+With the current deployable promotion filter and the loose support policy:
+
+- `booking_travel`
+  - `2` train episodes: `4.55%` weighted held-out reduction
+  - `6` train episodes: `14.06%`
+  - `7` train episodes: `17.39%`
+  - `8` train episodes: `19.05%`
+  - `9` train episodes: `22.22%`
+- `search_local`
+  - `2` train episodes: `3.27%`
+  - `6` train episodes: `7.65%`
+  - `7` train episodes: `9.97%`
+  - `8` train episodes: `10.18%`
+  - `10` train episodes: `16.96%`
+  - `13` train episodes: `39.58%`, but only `2` rich groups remain there
+- `ecommerce`
+  - `2-3` train episodes: `0%`
+  - `4` train episodes: `0.45%`
+  - `7` train episodes: `1.74%`
+  - `8` train episodes: `2.82%`
+  - `11-12` train episodes: `6.25%`, but only `1` rich bucket remains
+
+So the current threshold picture is:
+
+- booking/travel buckets become useful around `6-7` good runs
+- local/search buckets become useful around `8-10` runs
+- broad e-commerce buckets are still weak under the current promotion filter
+
+This is the first real answer to the “how much data per site?” question:
+
+- there is no single universal threshold
+- but `6-8` completed runs per bucket is already enough to matter for repeated travel-like workflows
+- under the current abstraction, e-commerce is not data-limited so much as representation-limited
+
+The WorkArena scaling result is even cleaner.
+
+On the current ServiceNow bucket:
+
+- loose support:
+  - `2-3` train episodes: `23.53%`
+  - `4+` train episodes: `58.82%`
+- strict support:
+  - stays at `23.53%`
+
+So in a dense repeated family, one longer reusable macro can appear very early, and stricter support thresholds can actually block the good chunk.
+
+Interpretation:
+
+- the current system likes workflow families with stable forms and stable ordering
+- the main threshold is not “big data”
+- it is “enough repeated runs inside a coherent bucket”
+
+![Mind2Web data scaling](docs/figures/mind2web_data_scaling.svg)
+
+![WorkArena data scaling](docs/figures/workarena_data_scaling.svg)
+
+### Example Before/After Traces
+
+To make the traces more concrete, we exported focused case studies:
+
+- `outputs/mind2web_trace_case_studies.json`
+
+The results are very revealing.
+
+Positive fallback example on `amazon` site-level:
+
+- promoted macro:
+  - `amazon_search_m009`
+  - `TYPE|role=input|label=search|use=B01`
+  - `CLICK|role=input|label=<TEXT>`
+- held-out site-level reduction:
+  - `3.85%`
+
+Before:
+
+```text
+TYPE|role=input|label=search|use=B01
+CLICK|role=input|label=<TEXT>
+CLICK|role=text
+CLICK|role=link
+CLICK|role=button
+TYPE|role=input|label=search|use=B02
+CLICK|role=input|label=<TEXT>
+CLICK|role=text
+CLICK|role=link
+CLICK|role=button
+```
+
+After:
+
+```text
+MACRO:M009
+CLICK|role=text
+CLICK|role=link
+CLICK|role=button
+TYPE|role=input|label=search|use=B02
+CLICK|role=input|label=<TEXT>
+CLICK|role=text
+CLICK|role=link
+CLICK|role=button
+```
+
+So Amazon is not completely hopeless, but the public slice only yields a very small site-level search macro.
+
+Negative example on `amazon::cart`:
+
+- `0` promoted macros
+- best candidate:
+  - `CLICK|role=link -> CLICK|role=link`
+- rejection reason:
+  - `replay_precision < 0.5`
+  - `not_function_like`
+
+This is exactly the kind of pattern we do **not** want to auto-promote. It compresses syntax, but not meaning.
+
+Positive workflow example on `united::flight`:
+
+- promoted macro:
+  - `united_flight_search_m012`
+  - `TYPE origin -> CLICK -> TYPE destination -> CLICK -> CLICK depart`
+- held-out reduction:
+  - `13.79%`
+
+Before:
+
+```text
+CLICK|role=input|label=<TEXT>
+TYPE|role=input|label=<TEXT>|use=B01
+CLICK|role=button
+TYPE|role=input|label=<TEXT>|use=B02
+CLICK|role=button
+CLICK|role=input|label=depart
+CLICK|role=button
+CLICK|role=button
+CLICK|role=text
+CLICK|role=text
+CLICK|role=button
+CLICK|role=button
+```
+
+After:
+
+```text
+CLICK|role=input|label=<TEXT>
+MACRO:M012
+CLICK|role=button
+CLICK|role=button
+CLICK|role=text
+CLICK|role=text
+CLICK|role=button
+CLICK|role=button
+CLICK|role=section
+CLICK|role=button
+```
+
+That is much closer to the kind of reusable function we actually want.
+
 ### What this means
 
 The project is still on track, but the target is now sharper.
@@ -2159,6 +2336,57 @@ If the controller chooses a macro:
 - if expansion or matching fails, fall back to primitive actions
 
 This fallback is what keeps the system safe while we test more ambitious macro libraries.
+
+## Continuous deployment loop
+
+We now also have a concrete bucketed store format and update policy:
+
+- builder:
+  - `scripts/build_macro_store.py`
+- example output:
+  - `outputs/mind2web_bucketed_macro_store.json`
+
+The current recommended deployment loop is:
+
+1. Log successful primitive traces continuously.
+2. Bucket them by `website_task_family`.
+3. Shadow-build a bucket once it has at least `4` completed episodes.
+4. Mark it live-ready only if:
+   - it has at least `6` episodes
+   - it has at least one promoted macro
+   - shadow held-out decision reduction is at least `10%`
+5. Rebuild the bucket after every `2` new successful episodes.
+6. Also maintain a site-level fallback registry for cases like Amazon where the site+task bucket is too sparse.
+
+On the current Mind2Web full-train trace set, that procedure yields:
+
+- primary `website_task_family` buckets:
+  - `132` shadow-ready
+  - `17` live-ready
+  - `33` promoted macros
+- site-level fallback buckets:
+  - `73` shadow-ready
+  - `21` live-ready
+  - `50` promoted macros
+
+Some of the strongest live-ready primary buckets are:
+
+- `ticketcenter::search`: `40.0%`
+- `yelp::search`: `39.39%`
+- `aa::flight`: `37.5%`
+- `kayak::lodging`: `27.78%`
+
+Some useful fallback-only site buckets are:
+
+- `yelp`: `28.57%`
+- `aa`: `20.69%`
+- `newegg`: `14.29%`
+
+This suggests a practical universal strategy:
+
+- exact bucket first
+- site fallback second
+- no global macro menu by default
 
 ## Minimal universal algorithm
 

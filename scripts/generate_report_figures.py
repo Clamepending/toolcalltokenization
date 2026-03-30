@@ -64,6 +64,10 @@ def build_summary() -> dict:
     trigger1_registry = load_json(ROOT / "outputs" / "miniwob_live_v3_global_trigger_p1_v3_macro_registry.json")
     workarena_selector_llm_guard = load_json(ROOT / "outputs" / "workarena_service_catalog_v1_llm_guard_selector.json")
     workarena_selector_llm_guard_v2 = load_json(ROOT / "outputs" / "workarena_service_catalog_v1_llm_guard_selector_v2.json")
+    mind2web_data_scaling = load_json(ROOT / "outputs" / "mind2web_data_scaling_study.json")
+    workarena_data_scaling = load_json(ROOT / "outputs" / "workarena_service_catalog_data_scaling.json")
+    mind2web_macro_store = load_json(ROOT / "outputs" / "mind2web_bucketed_macro_store.json")
+    mind2web_case_studies = load_json(ROOT / "outputs" / "mind2web_trace_case_studies.json")
 
     mind2web_covered_steps = sum(
         group["summary"]["primitive_steps"]
@@ -118,6 +122,8 @@ def build_summary() -> dict:
             "workarena_live_oracle": workarena_live_oracle["summary"],
             "workarena_live_learned": workarena_live_learned["summary"],
             "workarena_live_llm": workarena_live_llm["summary"],
+            "mind2web_data_scaling_recommendations": mind2web_data_scaling["recommendations"],
+            "mind2web_macro_store": mind2web_macro_store["summary"],
             "miniwob_stable_replay_upper_bound": miniwob_replay["summary"],
             "miniwob_local_oracle": miniwob_local_oracle["summary"],
             "miniwob_global_exact": miniwob_global_exact["summary"],
@@ -180,6 +186,10 @@ def build_summary() -> dict:
                 {"label": "Replay upper bound", **workarena_service_catalog["summary"]},
             ],
         },
+        "mind2web_data_scaling": mind2web_data_scaling,
+        "workarena_data_scaling": workarena_data_scaling,
+        "mind2web_macro_store": mind2web_macro_store,
+        "mind2web_case_studies": mind2web_case_studies,
         "global_trigger_failures": {
             "failed_by_macro": failed_by_macro,
             "failed_by_task": failed_by_task,
@@ -448,6 +458,90 @@ def plot_workarena_live_policy_sweep(summary: dict) -> Path:
     return output
 
 
+def plot_mind2web_data_scaling(summary: dict) -> Path:
+    scaling = summary["mind2web_data_scaling"]
+    category_curves = scaling["category_curves"]
+    representative = scaling["representative_curves"]
+
+    fig, axes = plt.subplots(2, 1, figsize=(10.6, 8.0), gridspec_kw={"height_ratios": [1.1, 1.1]})
+
+    category_styles = {
+        "booking_travel": ("Booking / travel", "#457b9d"),
+        "search_local": ("Local/search", "#2a9d8f"),
+        "ecommerce": ("E-commerce", "#bc6c25"),
+    }
+    for cohort, (label, color) in category_styles.items():
+        points = category_curves[cohort]["curves"]["loose"]["points"]
+        xs = [item["train_episodes"] for item in points]
+        ys = [percent(item["weighted_decision_reduction_ratio"]) for item in points]
+        axes[0].plot(xs, ys, marker="o", linewidth=2, color=color, label=label)
+    axes[0].set_ylabel("Weighted Held-Out\nDecision Reduction (%)")
+    axes[0].set_title("Data Requirements Depend Heavily on Workflow Cohort")
+    axes[0].grid(alpha=0.25)
+    axes[0].legend(loc="upper left")
+    axes[0].text(6, 15.5, "Travel crosses ~10%\nby ~6 train episodes", fontsize=9, color="#1d3557")
+    axes[0].text(8, 7.5, "Search_local reaches ~10%\nby ~8 train episodes", fontsize=9, color="#0b6e4f")
+    axes[0].text(7, 1.0, "E-commerce stays sparse\nunder deployable filters", fontsize=9, color="#7f3f12")
+
+    site_styles = {
+        "amazon": ("Amazon (site fallback)", "#8d6e63"),
+        "amazon::cart": ("Amazon cart", "#d62828"),
+        "united::flight": ("United flight", "#457b9d"),
+        "yelp::search": ("Yelp search", "#2a9d8f"),
+    }
+    for group_key, (label, color) in site_styles.items():
+        points = representative[group_key]["curves"]["loose"]["points"]
+        xs = [item["train_episodes"] for item in points]
+        ys = [percent(item["decision_reduction_ratio"]) for item in points]
+        axes[1].plot(xs, ys, marker="o", linewidth=2, color=color, label=label)
+    axes[1].set_xlabel("Train Episodes in Bucket")
+    axes[1].set_ylabel("Held-Out Decision\nReduction (%)")
+    axes[1].set_title("Representative Buckets: Site Fallback Helps Amazon, but Amazon Cart Never Clears Promotion")
+    axes[1].grid(alpha=0.25)
+    axes[1].legend(loc="upper left")
+    axes[1].text(11, 6.0, "Amazon site fallback gives\nonly one small search macro", fontsize=9, color="#6d4c41")
+    axes[1].text(3.7, 1.3, "Amazon cart stays at zero", fontsize=9, color="#9d0208")
+    axes[1].text(7.1, 15.5, "United ramps gradually to a\n5-step flight-entry macro", fontsize=9, color="#1d3557")
+    axes[1].text(2.2, 36.0, "Yelp-like search buckets can\nbe compressed very early", fontsize=9, color="#0b6e4f")
+
+    fig.tight_layout()
+    output = DOCS_FIGURES / "mind2web_data_scaling.svg"
+    fig.savefig(output, bbox_inches="tight")
+    plt.close(fig)
+    return output
+
+
+def plot_workarena_data_scaling(summary: dict) -> Path:
+    scaling = summary["workarena_data_scaling"]
+    curves = scaling["representative_curves"]["servicenow::generic"]["curves"]
+    styles = {
+        "loose": ("Loose support", "#2a9d8f"),
+        "adaptive": ("Adaptive support", "#457b9d"),
+        "strict": ("Strict support", "#d62828"),
+    }
+
+    fig, ax = plt.subplots(figsize=(9.4, 5.2))
+    for policy, (label, color) in styles.items():
+        points = curves[policy]["points"]
+        xs = [item["train_episodes"] for item in points]
+        ys = [percent(item["decision_reduction_ratio"]) for item in points]
+        ax.plot(xs, ys, marker="o", linewidth=2, color=color, label=label)
+
+    ax.set_xlabel("Train Episodes in ServiceNow Bucket")
+    ax.set_ylabel("Held-Out Decision Reduction (%)")
+    ax.set_title("WorkArena Service-Catalog Macros Appear Quickly Once a Few Similar Runs Accumulate")
+    ax.grid(alpha=0.25)
+    ax.legend(loc="upper left")
+    ax.text(4.0, 60.0, "Loose policy jumps as soon as a\n6-step reusable chunk is seen", fontsize=9, color="#0b6e4f")
+    ax.text(7.0, 28.0, "Strict policy stays safer but\nmisses the longer chunk", fontsize=9, color="#8d1f1f")
+
+    fig.tight_layout()
+    output = DOCS_FIGURES / "workarena_data_scaling.svg"
+    fig.savefig(output, bbox_inches="tight")
+    plt.close(fig)
+    return output
+
+
 def plot_global_sweep(summary: dict) -> Path:
     sweep = summary["global_trigger_sweep"]
     labels = [item["label"] for item in sweep]
@@ -654,7 +748,9 @@ def main() -> None:
     outputs = {
         "overview": str(plot_overall(summary)),
         "mind2web_hierarchy": str(plot_mind2web_hierarchy(summary)),
+        "mind2web_data_scaling": str(plot_mind2web_data_scaling(summary)),
         "workarena_service_catalog": str(plot_workarena_service_catalog(summary)),
+        "workarena_data_scaling": str(plot_workarena_data_scaling(summary)),
         "workarena_selector_sweep": str(plot_workarena_selector_sweep(summary)),
         "workarena_live_policy_sweep": str(plot_workarena_live_policy_sweep(summary)),
         "global_sweep": str(plot_global_sweep(summary)),
