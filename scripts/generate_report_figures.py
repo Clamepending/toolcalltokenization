@@ -65,6 +65,7 @@ def build_summary() -> dict:
     workarena_selector_llm_guard = load_json(ROOT / "outputs" / "workarena_service_catalog_v1_llm_guard_selector.json")
     workarena_selector_llm_guard_v2 = load_json(ROOT / "outputs" / "workarena_service_catalog_v1_llm_guard_selector_v2.json")
     mind2web_data_scaling = load_json(ROOT / "outputs" / "mind2web_data_scaling_study.json")
+    mind2web_major_site_curves = load_json(ROOT / "outputs" / "mind2web_major_site_curves.json")
     workarena_data_scaling = load_json(ROOT / "outputs" / "workarena_service_catalog_data_scaling.json")
     mind2web_macro_store = load_json(ROOT / "outputs" / "mind2web_bucketed_macro_store.json")
     mind2web_case_studies = load_json(ROOT / "outputs" / "mind2web_trace_case_studies.json")
@@ -123,6 +124,7 @@ def build_summary() -> dict:
             "workarena_live_learned": workarena_live_learned["summary"],
             "workarena_live_llm": workarena_live_llm["summary"],
             "mind2web_data_scaling_recommendations": mind2web_data_scaling["recommendations"],
+            "mind2web_major_site_missing": mind2web_major_site_curves["sites_missing"],
             "mind2web_macro_store": mind2web_macro_store["summary"],
             "miniwob_stable_replay_upper_bound": miniwob_replay["summary"],
             "miniwob_local_oracle": miniwob_local_oracle["summary"],
@@ -187,6 +189,7 @@ def build_summary() -> dict:
             ],
         },
         "mind2web_data_scaling": mind2web_data_scaling,
+        "mind2web_major_site_curves": mind2web_major_site_curves,
         "workarena_data_scaling": workarena_data_scaling,
         "mind2web_macro_store": mind2web_macro_store,
         "mind2web_case_studies": mind2web_case_studies,
@@ -542,6 +545,93 @@ def plot_workarena_data_scaling(summary: dict) -> Path:
     return output
 
 
+def plot_major_site_curves(summary: dict) -> Path:
+    curves = summary["mind2web_major_site_curves"]
+    ecommerce_sites = ["amazon", "ebay", "apple", "target", "newegg"]
+    travel_sites = ["united", "yelp", "booking", "kayak"]
+    colors = {
+        "amazon": "#8d6e63",
+        "ebay": "#6d597a",
+        "apple": "#9aa0a6",
+        "target": "#d62828",
+        "newegg": "#1f77b4",
+        "united": "#457b9d",
+        "yelp": "#2a9d8f",
+        "booking": "#bc6c25",
+        "kayak": "#6a994e",
+    }
+
+    fig, axes = plt.subplots(2, 2, figsize=(11.6, 8.6), sharex=False)
+
+    def plot_panel(ax, sites, metric, title, ylabel):
+        for site in sites:
+            if site not in curves["curves"]:
+                continue
+            points = curves["curves"][site]["points"]
+            xs = [item["total_episodes"] for item in points]
+            ys = [item[metric] * 100.0 if metric.startswith("trigger_precision") else item[metric] for item in points]
+            ax.plot(xs, ys, marker="o", linewidth=2, label=site, color=colors.get(site))
+        ax.set_title(title)
+        ax.set_ylabel(ylabel)
+        ax.grid(alpha=0.25)
+
+    plot_panel(
+        axes[0][0],
+        ecommerce_sites,
+        "compression_ratio",
+        "E-commerce Sites: Held-Out Compression Ratio\n(2 held-out episodes, lower is better)",
+        "Compression Ratio",
+    )
+    plot_panel(
+        axes[0][1],
+        ecommerce_sites,
+        "trigger_precision_prefix1",
+        "E-commerce Sites: 1-Step Trigger Precision\n(accuracy proxy, higher is better)",
+        "1-Step Trigger Precision (%)",
+    )
+    plot_panel(
+        axes[1][0],
+        travel_sites,
+        "compression_ratio",
+        "Travel / Local Sites: Held-Out Compression Ratio\n(2 held-out episodes, lower is better)",
+        "Compression Ratio",
+    )
+    plot_panel(
+        axes[1][1],
+        travel_sites,
+        "trigger_precision_prefix1",
+        "Travel / Local Sites: 1-Step Trigger Precision\n(accuracy proxy, higher is better)",
+        "1-Step Trigger Precision (%)",
+    )
+
+    axes[0][0].set_ylim(0.6, 1.02)
+    axes[1][0].set_ylim(0.6, 1.02)
+    axes[0][1].set_ylim(0, 105)
+    axes[1][1].set_ylim(0, 105)
+    axes[1][0].set_xlabel("Total Episodes in Site Bucket")
+    axes[1][1].set_xlabel("Total Episodes in Site Bucket")
+    axes[0][0].legend(loc="lower left", fontsize=8)
+    axes[1][0].legend(loc="lower left", fontsize=8)
+
+    axes[0][0].text(10.5, 0.985, "Amazon / eBay / Apple / Target stay flat\nunder the current safe promotion filter", fontsize=9, color="#5c4033")
+    axes[0][0].text(14.0, 0.69, "NewEgg is the only requested\ne-commerce site with clear gains", fontsize=9, color="#1f4e79")
+    axes[1][0].text(7.5, 0.67, "Yelp compresses fastest,\nUnited ramps more gradually", fontsize=9, color="#0b6e4f")
+    axes[1][1].text(6.0, 18, "Yelp shows the clearest\n1-step ambiguity tax", fontsize=9, color="#0b6e4f")
+
+    missing = ", ".join(curves.get("sites_missing", []))
+    fig.suptitle(
+        "Major-Site Learning Curves: Compression Improves on Some Sites, While Accuracy Stays Conservative\n"
+        + (f"Missing from current public slice: {missing}" if missing else ""),
+        y=0.995,
+        fontsize=14,
+    )
+    fig.tight_layout(rect=(0, 0, 1, 0.96))
+    output = DOCS_FIGURES / "major_site_learning_curves.svg"
+    fig.savefig(output, bbox_inches="tight")
+    plt.close(fig)
+    return output
+
+
 def plot_global_sweep(summary: dict) -> Path:
     sweep = summary["global_trigger_sweep"]
     labels = [item["label"] for item in sweep]
@@ -749,6 +839,7 @@ def main() -> None:
         "overview": str(plot_overall(summary)),
         "mind2web_hierarchy": str(plot_mind2web_hierarchy(summary)),
         "mind2web_data_scaling": str(plot_mind2web_data_scaling(summary)),
+        "major_site_learning_curves": str(plot_major_site_curves(summary)),
         "workarena_service_catalog": str(plot_workarena_service_catalog(summary)),
         "workarena_data_scaling": str(plot_workarena_data_scaling(summary)),
         "workarena_selector_sweep": str(plot_workarena_selector_sweep(summary)),

@@ -2096,6 +2096,87 @@ Interpretation:
 
 ![WorkArena data scaling](docs/figures/workarena_data_scaling.svg)
 
+### Major-site learning curves
+
+We also generated fixed-heldout learning curves for major websites using exactly `2` held-out episodes per site.
+
+Artifact:
+
+- `outputs/mind2web_major_site_curves.json`
+- figure: `docs/figures/major_site_learning_curves.svg`
+
+Important note:
+
+- `google` and `ubereats` are **not** present in the current public Mind2Web slice, so they cannot be plotted yet
+- the current figure therefore covers:
+  - `amazon`
+  - `ebay`
+  - `apple`
+  - `target`
+  - `newegg`
+  - `united`
+  - `yelp`
+  - `booking`
+  - `kayak`
+
+For each site, the x-axis is:
+
+- total episodes in the site bucket
+- where `2` means `0` train episodes and `2` held-out episodes
+
+The two plotted metrics are:
+
+- held-out compression ratio
+  - lower is better
+- `1`-step trigger precision
+  - an accuracy proxy for how safe the promoted macros would be under a simpler agent-side trigger rule
+
+The current pattern is sharp.
+
+Flat or nearly flat under the current safe promotion filter:
+
+- `amazon`
+- `ebay`
+- `apple`
+- `target`
+
+These stay at or extremely close to compression ratio `1.0`, meaning:
+
+- the current deployable promotion logic does not find enough safe, function-like macros on those site-level buckets
+
+Sites that do improve:
+
+- `newegg`
+  - compression ratio drops to `0.8333` at `3` total episodes
+  - reaches `0.6667` by `6` total episodes
+- `united`
+  - first site-level macro appears around `6` total episodes
+  - reaches `0.8182` by `18` total episodes
+- `yelp`
+  - drops to `0.7647` at `3` total episodes
+  - reaches `0.6471` by `17-20` total episodes
+- `kayak`
+  - first improvement around `6` total episodes
+  - reaches `0.8571` by `10` total episodes
+- `booking`
+  - only slight movement, around `0.9487-0.9744`
+
+The most useful accuracy-side finding is:
+
+- for most sites, promoted macros remain extremely conservative under the current filter
+- `2`-step replay precision is effectively perfect in these site curves
+- but `1`-step precision exposes ambiguity on some sites, especially `yelp`
+  - `0.2` early
+  - `0.3333` later
+
+So the current site-level bottleneck is not that promoted macros are inaccurate once vetted.
+It is that:
+
+- many sites never get enough safe macros at all
+- and some sites, like `yelp`, still need a stronger trigger than “first step matches”
+
+![Major-site learning curves](docs/figures/major_site_learning_curves.svg)
+
 ### Example Before/After Traces
 
 To make the traces more concrete, we exported focused case studies:
@@ -2196,6 +2277,124 @@ CLICK|role=button
 ```
 
 That is much closer to the kind of reusable function we actually want.
+
+### Current bottleneck to get compression higher without losing accuracy
+
+The new site curves make the current bottleneck clearer than before.
+
+If we keep the current held-out-safe promotion filter, then on many major sites:
+
+- compression stays near `1.0`
+- not because the site has no repeated actions
+- but because the repeated chunks are either:
+  - too generic
+  - too brittle
+  - or not clearly function-like enough to promote safely
+
+The current bottlenecks, in order, are:
+
+1. **Coverage inside a site is still low.**
+   Amazon, eBay, Apple, and Target remain essentially flat at site level under the safe filter.
+
+2. **Function-like filtering rejects many compressible click loops.**
+   This is intentional. For example, `newegg::search` still has candidates with replay precision `0.5-1.0` that are rejected as `not_function_like`.
+
+3. **The current miner is contiguous and exact.**
+   Optional steps, popups, alternate branches, and reorderings break long workflows into smaller fragments.
+
+4. **Task mixing inside a site fragments support.**
+   A single site bucket can contain search, cart, reservation, gift-card, and filter tasks that do not share one clean long skeleton.
+
+5. **The current data has very sparse auth/login coverage.**
+   So the easiest high-value macro class is underrepresented in the public slice.
+
+6. **Longer macros need better state abstraction, not just a bigger max length.**
+   Raising the cap alone does not make stable `20`-step workflows appear.
+
+So if the goal is “more compression with no task-accuracy loss,” the next best levers are:
+
+- better bucket purity
+- better page-state signatures
+- optional/gapped macro mining
+- hierarchical composition of shorter macros into larger routines
+- denser same-site trace collection
+
+What will **not** work well by itself:
+
+- simply lowering replay-precision thresholds
+- promoting generic click chains
+- globally pooling macros across unrelated sites
+
+### Would login macros naturally emerge?
+
+They probably would, yes, but the current public data is not the right slice to prove it cleanly.
+
+What we found:
+
+- there are **no** Amazon auth episodes in the current public Mind2Web slice
+- the densest auth bucket we found is `tesla`, with only `3` episodes
+- most other auth buckets have only `1` episode
+
+So we cannot make a strong empirical Amazon-login curve from the current data because the traces simply are not there.
+
+That said, the current positive results strongly suggest that login-style macros are exactly the kind of thing that should emerge quickly when repeated traces exist:
+
+- login is short
+- login is structured
+- login has only a few arguments
+- login tends to have stable UI order
+
+The current pipeline already learns analogous patterns:
+
+- parameterized flight-entry macros on `united`
+- repeated service-catalog form-fill macros on WorkArena
+
+So a real `login(user, pass)` macro is much more plausible than, say, a giant multi-page Amazon checkout macro.
+
+### Would much bigger macros, like 20-step routines, naturally emerge?
+
+Not from the current public browser traces, even if we allow them.
+
+We explicitly probed longer lengths by raising `max_chunk_len` to `20`.
+
+What happened:
+
+- `united::flight`
+  - longest discovered chunk: `8`
+  - strongest promotable chunk: length `5`
+- `yelp::search`
+  - longest discovered chunk: `7`
+  - strongest promotable chunk: length `6`
+- site-level `amazon`
+  - longest discovered chunk: `7`
+  - strongest promotable chunk is still generic and not very meaningful
+- WorkArena service catalog
+  - longest discovered chunk: `8`
+  - promotable chunks of length `7-8` do appear
+
+So the current evidence is:
+
+- longer macros **can** emerge in dense repeated benchmark families
+- but they do **not** naturally stretch to `20` steps under exact contiguous mining
+
+That is not mainly because we capped the miner too aggressively.
+It is because long real-world workflows usually contain:
+
+- optional branches
+- extra navigation
+- interrupts
+- small UI variations
+
+So a practical route to “big macros” is probably:
+
+1. discover short reliable macros first
+2. compose them hierarchically
+3. or mine stateful/gapped templates instead of exact contiguous chunks
+
+In other words:
+
+- a `login(user, pass)` macro should emerge naturally with the right data
+- a `20`-step “buy first Amazon product and check out” macro probably needs either much denser traces or a richer mining algorithm than the current contiguous exact one
 
 ### What this means
 

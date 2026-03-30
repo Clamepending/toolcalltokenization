@@ -156,6 +156,10 @@ python3 scripts/export_trace_case_study.py \
 python3 scripts/build_macro_store.py \
   --input outputs/mind2web_full_train_dataflow_coarse/canonical_trace.jsonl \
   --output outputs/mind2web_bucketed_macro_store.json
+
+python3 scripts/run_major_site_curves.py \
+  --input outputs/mind2web_full_train_dataflow_coarse/canonical_trace.jsonl \
+  --output outputs/mind2web_major_site_curves.json
 ```
 
 To sweep action representations instead of using just one canonical form, rerun
@@ -195,6 +199,7 @@ To measure utility instead of just discovery:
 - use `run_macro_data_scaling_study.py` to measure how many completed runs per bucket are needed before macros become useful
 - use `export_trace_case_study.py` to export before/after compressed traces for concrete buckets like `amazon` or `united::flight`
 - use `build_macro_store.py` to emit a deployable bucketed JSON registry with shadow-eval statistics and live-ready flags
+- use `run_major_site_curves.py` to generate fixed-heldout major-site learning curves for compression and trigger-safety
 
 The current savings numbers are still **decision-side estimates**, not real browser wall-clock timings. Real wall-clock measurements will need a controlled online benchmark.
 
