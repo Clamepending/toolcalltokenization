@@ -3363,3 +3363,31 @@ So the safest current recommendation remains:
 - only scale once both of these are true:
   - local/server recording coverage is comfortably above `0.8`
   - repeated episodes within the family show stable action patterns rather than diverging tool strategies
+
+### OttoAuth Reliability Hardening
+
+The latest tiny Amazon batch also exposed an operational issue: one task completed cleanly, while the follow-on task stayed in `delivered` state with only a single `task_received` event written locally.
+
+That means the current deployed extension can still leave the queue in an ambiguous state where:
+
+- the server row remains `delivered`
+- the local trace folder exists
+- the trace never progresses beyond the initial receipt event
+
+To make that failure mode cheaper and easier to debug, I added two collection-side hardening changes in the extension:
+
+1. Running trace checkpointing
+   - long OttoAuth tasks now persist progress snapshots while still running
+   - this makes it much easier to distinguish “slow model call” from “stalled session”
+
+2. Task heartbeat + hard timeout
+   - running tasks emit heartbeat events
+   - OttoAuth tasks now fail after a fixed timeout rather than staying `delivered` forever
+
+These changes are in the extension code, not the macro-mining repo:
+
+- `chrome-extension/src/sidepanel/agent/traceRecorder.ts`
+- `chrome-extension/src/sidepanel/agent/ottoAuthBridge.ts`
+- `chrome-extension/src/shared/constants.ts`
+
+This does **not** yet prove that the underlying hang is fully fixed. It does ensure that future collection runs will be cheaper to monitor and less likely to wedge silently.
