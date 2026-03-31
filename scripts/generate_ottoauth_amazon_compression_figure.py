@@ -79,7 +79,7 @@ def save_figure(study: dict, output: Path) -> None:
     ax.text(
         0.99,
         0.01,
-        "Held-out episodes per point: 2\nDecision reduction = 1 - compression ratio",
+        "Held-out episodes per point = ceil(20% of bucket size), min 1\nDecision reduction = 1 - compression ratio",
         transform=ax.transAxes,
         ha="right",
         va="bottom",

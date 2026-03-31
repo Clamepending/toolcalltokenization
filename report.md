@@ -32,7 +32,7 @@ Yes, but only in the right regime.
    No-training semantic macro choice is not enough by itself. A lightweight structural guard or learned chooser is still important.
 
 4. **Real production-agent traces do start to yield useful macros.**
-   On OttoAuth Amazon traces, `amazon.com::search` now reaches `41.67%` held-out decision reduction and `amazon.com::cart` reaches `18.87%`.
+   On OttoAuth Amazon traces, `amazon.com::search` reaches `41.67%` held-out decision reduction, `amazon.com::cart` reaches `21.74%`, and site-wide `amazon.com` reaches `26.03%` under the current 20%-held-out split.
 
 5. **The first real e-commerce macro to emerge is search-phase, not checkout-phase.**
    We see something like `amazon_search(query)` before anything like `add_to_cart()` or `checkout(address)`.
@@ -99,9 +99,9 @@ Interpretation:
 
 Current live OttoAuth Amazon picture:
 
-- site-wide `amazon.com` peaks at `22.64%`
+- site-wide `amazon.com` peaks at `26.03%`
 - `amazon.com::search` peaks at `41.67%`
-- `amazon.com::cart` peaks at `18.87%`
+- `amazon.com::cart` peaks at `21.74%`
 - `amazon.com::checkout` shows `50%`, but on only `2` traces, so it is not meaningful yet
 
 Interpretation:
@@ -119,9 +119,9 @@ Interpretation:
 - **WorkArena replay/oracle:** `28 -> 10`, `64.29%`
 - **WorkArena learned live controller:** `28 -> 18`, `35.71%`
 - **WorkArena no-training LLM live controller:** `28 -> 27`, `3.57%`
-- **OttoAuth Amazon site-wide:** `22.64%`
+- **OttoAuth Amazon site-wide:** `26.03%`
 - **OttoAuth Amazon search:** `41.67%`
-- **OttoAuth Amazon cart:** `18.87%`
+- **OttoAuth Amazon cart:** `21.74%`
 
 ## What Works
 
@@ -149,6 +149,44 @@ The issue is not that long macros are impossible. The issue is that they need:
 - enough trigger precision to be callable safely
 
 Today, Amazon traces still diverge too much after the common search-entry prefix, so `add_to_cart()` and `checkout(address)` have not yet stabilized.
+
+## Greedy Pair-Merge Baseline
+
+I also compared the current brute-force chunk miner against a greedy repeated-pair-replacement baseline, which is closer to **Re-Pair** than classic online **Sequitur**.
+
+Figure:
+
+![Brute-force vs pair-merge](docs/figures/pair_merge_vs_bruteforce.svg)
+
+Current takeaway:
+
+- on clean, strongly hierarchical buckets, pair-merge is often just as good
+- on OttoAuth Amazon:
+  - `amazon.com`: exact tie, `20.55%`
+  - `amazon.com::search`: exact tie, `41.67%`
+  - `amazon.com::cart`: exact tie, `21.74%`
+- on `united::flight`: exact tie, `13.79%`
+- on noisier overlapping buckets, brute force is better:
+  - `yelp::search`: brute force `39.39%`, pair-merge `30.30%`
+
+Interpretation:
+
+- greedy pair-merge is a strong simpler baseline
+- but it commits to one merge hierarchy and can miss overlapping medium-length macros that brute force can still propose and promote
+- so pair-merge looks attractive for incremental online macro growth, but brute force is still the stronger offline discovery method in noisy buckets
+
+Concrete toy example:
+
+- suppose the useful overlapping candidates are:
+  - `search(query) = A B C`
+  - `open_first_result() = C D`
+  - `search_then_open_first_result(query) = A B C D`
+- brute force can keep all three candidates alive and let held-out replay decide which ones are worth promoting
+- greedy pair-merge has to commit early:
+  - if it merges `A B -> X`, the sequence becomes `X C D`
+  - that makes `A B C D` easy to build as `X C D`
+  - but it can crowd out or delay the overlapping `C D` view as an independent reusable tool
+- browser-agent tool libraries often want overlapping callable routines, not one single best segmentation of the trace
 
 ## Minimal Algorithm
 
@@ -197,7 +235,7 @@ That already looks promising on MiniWoB, WorkArena, and early Amazon live-agent 
 ```bash
 git clone https://github.com/Clamepending/toolcalltokenization.git
 cd toolcalltokenization
-git checkout b529794
+git checkout c8d3a93
 
 python3 -m pip install -U huggingface_hub
 python3 - <<'PY'

@@ -11,6 +11,7 @@ from .trace_utils import (
     macro_has_binding,
     macro_interface,
     macro_usage_summary,
+    mine_pair_merge_macros,
     mine_frequent_chunks,
     represent_rows,
     summarize_macro_savings,
@@ -204,32 +205,23 @@ def heuristic_macro_description(group_key: str, macro: dict, interface: dict) ->
     )
 
 
-def promote_macros_for_group(
+def promote_candidate_macros_for_group(
     group_key: str,
-    train_sequences: Dict[str, Sequence[str]],
+    macros: Sequence[dict],
     eval_sequences: Dict[str, Sequence[str]],
     *,
     canonicalization_mode: str = "dataflow_coarse",
-    top_k: int = 25,
-    max_chunk_len: int = 6,
-    min_support: int = 2,
-    min_promoted_support: int | None = None,
     trigger_prefix_len: int = 2,
     min_length: int = 2,
     max_length: int = 6,
     min_replay_precision: float = 0.5,
     min_exact_replays: int = 1,
     min_steps_saved: int = 1,
+    min_promoted_support: int = 2,
     require_binding: bool = False,
     allow_generic_click_loops: bool = False,
 ) -> dict:
-    promoted_support = min_support if min_promoted_support is None else min_promoted_support
-    macros = mine_frequent_chunks(
-        {episode_id: list(sequence) for episode_id, sequence in train_sequences.items()},
-        min_support=min_support,
-        max_chunk_len=max_chunk_len,
-        top_k=top_k,
-    )
+    promoted_support = int(min_promoted_support)
     replay = evaluate_macro_replay(macros, {episode_id: list(sequence) for episode_id, sequence in eval_sequences.items()}, trigger_prefix_len=trigger_prefix_len)
     usage = macro_usage_summary({episode_id: list(sequence) for episode_id, sequence in eval_sequences.items()}, macros)
     replay_by_id = {item["macro_id"]: item for item in replay["macros"]}
@@ -308,6 +300,96 @@ def promote_macros_for_group(
         "usage": usage,
         "savings": savings,
     }
+
+
+def promote_macros_for_group(
+    group_key: str,
+    train_sequences: Dict[str, Sequence[str]],
+    eval_sequences: Dict[str, Sequence[str]],
+    *,
+    canonicalization_mode: str = "dataflow_coarse",
+    top_k: int = 25,
+    max_chunk_len: int = 6,
+    min_support: int = 2,
+    min_promoted_support: int | None = None,
+    trigger_prefix_len: int = 2,
+    min_length: int = 2,
+    max_length: int = 6,
+    min_replay_precision: float = 0.5,
+    min_exact_replays: int = 1,
+    min_steps_saved: int = 1,
+    require_binding: bool = False,
+    allow_generic_click_loops: bool = False,
+) -> dict:
+    macros = mine_frequent_chunks(
+        {episode_id: list(sequence) for episode_id, sequence in train_sequences.items()},
+        min_support=min_support,
+        max_chunk_len=max_chunk_len,
+        top_k=top_k,
+    )
+    promoted_support = min_support if min_promoted_support is None else min_promoted_support
+    return promote_candidate_macros_for_group(
+        group_key,
+        macros,
+        eval_sequences,
+        canonicalization_mode=canonicalization_mode,
+        trigger_prefix_len=trigger_prefix_len,
+        min_length=min_length,
+        max_length=max_length,
+        min_replay_precision=min_replay_precision,
+        min_exact_replays=min_exact_replays,
+        min_steps_saved=min_steps_saved,
+        min_promoted_support=promoted_support,
+        require_binding=require_binding,
+        allow_generic_click_loops=allow_generic_click_loops,
+    )
+
+
+def promote_pair_merge_macros_for_group(
+    group_key: str,
+    train_sequences: Dict[str, Sequence[str]],
+    eval_sequences: Dict[str, Sequence[str]],
+    *,
+    canonicalization_mode: str = "dataflow_coarse",
+    top_k: int = 25,
+    num_merges: int = 50,
+    min_occurrences: int = 2,
+    min_support: int = 2,
+    min_promoted_support: int | None = None,
+    trigger_prefix_len: int = 2,
+    min_length: int = 2,
+    max_length: int = 6,
+    min_replay_precision: float = 0.5,
+    min_exact_replays: int = 1,
+    min_steps_saved: int = 1,
+    require_binding: bool = False,
+    allow_generic_click_loops: bool = False,
+) -> dict:
+    macros = mine_pair_merge_macros(
+        {episode_id: list(sequence) for episode_id, sequence in train_sequences.items()},
+        num_merges=num_merges,
+        min_occurrences=min_occurrences,
+        min_support=min_support,
+        top_k=top_k,
+        min_length=min_length,
+        max_length=max_length,
+    )
+    promoted_support = min_support if min_promoted_support is None else min_promoted_support
+    return promote_candidate_macros_for_group(
+        group_key,
+        macros,
+        eval_sequences,
+        canonicalization_mode=canonicalization_mode,
+        trigger_prefix_len=trigger_prefix_len,
+        min_length=min_length,
+        max_length=max_length,
+        min_replay_precision=min_replay_precision,
+        min_exact_replays=min_exact_replays,
+        min_steps_saved=min_steps_saved,
+        min_promoted_support=promoted_support,
+        require_binding=require_binding,
+        allow_generic_click_loops=allow_generic_click_loops,
+    )
 
 
 def load_grouped_sequences(

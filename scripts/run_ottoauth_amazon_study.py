@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from pathlib import Path
 
@@ -29,7 +30,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--input", required=True, help="Canonical JSONL trace file.")
     parser.add_argument("--output", required=True, help="Path to JSON output.")
     parser.add_argument("--website", default="amazon.com", help="Website bucket to study.")
-    parser.add_argument("--heldout-episodes", type=int, default=2, help="Fixed held-out episode count per bucket.")
+    parser.add_argument(
+        "--heldout-ratio",
+        type=float,
+        default=0.2,
+        help="Fraction of episodes reserved for held-out evaluation in each bucket. Rounded up.",
+    )
+    parser.add_argument(
+        "--heldout-episodes",
+        type=int,
+        default=None,
+        help="Optional fixed held-out episode count per bucket. Overrides --heldout-ratio if provided.",
+    )
     parser.add_argument("--support-policy", choices=("loose", "strict", "adaptive"), default="loose")
     parser.add_argument("--top-k", type=int, default=25)
     parser.add_argument("--max-chunk-len", type=int, default=6)
@@ -52,7 +64,11 @@ def curve_for_group(group_key: str, sequences: dict[str, list[str]], args: argpa
             "points": [],
         }
 
-    heldout = min(args.heldout_episodes, max(1, len(episode_ids) - 1))
+    if args.heldout_episodes is not None:
+        heldout = min(args.heldout_episodes, max(1, len(episode_ids) - 1))
+    else:
+        ratio = max(0.0, min(1.0, float(args.heldout_ratio)))
+        heldout = min(max(1, math.ceil(len(episode_ids) * ratio)), max(1, len(episode_ids) - 1))
     train_pool, eval_sequences = fixed_holdout_split(
         sequences,
         eval_ratio=heldout / len(episode_ids),
@@ -166,6 +182,7 @@ def main() -> None:
         "episodes": len(site_sequences),
         "event_count": len(amazon_rows),
         "support_policy": args.support_policy,
+        "heldout_ratio": args.heldout_ratio,
         "heldout_episodes": args.heldout_episodes,
         "curves": curves,
     }

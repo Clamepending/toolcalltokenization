@@ -1,0 +1,31 @@
+{
+  "heldout_ratio": 0.2,
+  "input": "/Users/mark/Desktop/projects/toolcalltokenization/outputs/ottoauth_live_collection/canonical_trace.jsonl",
+  "min_steps": 6,
+  "test_episodes": 3,
+  "test_ids": [
+    "mock_1774862238593_wzm716",
+    "mock_1774862610332_5q0cez",
+    "mock_1774862993870_18t77t"
+  ],
+  "total_episodes": 14,
+  "train_episodes": 8,
+  "train_ids": [
+    "mock_1774846494415_17vz22",
+    "mock_1774850130312_zcrfzw",
+    "mock_1774850130351_gdhjsx",
+    "mock_1774850130401_o67wl9",
+    "mock_1774856665174_e8qy7s",
+    "mock_1774858617731_5c7y5o",
+    "mock_1774858693596_r6ce2c",
+    "mock_1774858693920_ev89z4"
+  ],
+  "valid_episodes": 3,
+  "valid_ids": [
+    "mock_1774861116742_wbwxuy",
+    "mock_1774861212299_ql6407",
+    "mock_1774861212641_1kfnvv"
+  ],
+  "valid_ratio_within_train": 0.2,
+  "website": "amazon.com"
+}

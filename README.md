@@ -6,6 +6,7 @@ Small experiments for learning reusable browser-agent or tool-call action chunks
 
 - [Project plan](./report.md)
 - [Literature review](./browser-agent-tool-tokenization-report.md)
+- [Speculative decoding experiments](./speculative_decoding/README.md)
 
 ## Fastest Reproduction
 
@@ -37,6 +38,46 @@ python3 scripts/generate_ottoauth_amazon_figures.py \
 ```
 
 That reproduces the current Amazon learning-curve figure from the public HF dataset snapshot.
+
+## Speculative Decoding Reproduction
+
+To reproduce the new speculative-decoding sweep on the local Amazon traces:
+
+```bash
+./.venvbg/bin/python scripts/run_speculative_trace_benchmark.py
+
+./.venvbg/bin/python scripts/generate_speculative_decoding_figures.py
+```
+
+For the lightweight LoRA follow-up:
+
+```bash
+./.venvbg/bin/python scripts/prepare_speculative_lora_dataset.py
+
+./.venvbg/bin/python -m mlx_lm lora \
+  --train \
+  --model mlx-community/Qwen2.5-0.5B-Instruct-4bit \
+  --data /Users/mark/Desktop/projects/toolcalltokenization/speculative_decoding/datasets/amazon_trace_lm \
+  --adapter-path /Users/mark/Desktop/projects/toolcalltokenization/outputs/speculative_decoding/amazon_qwen05_lora \
+  --batch-size 1 \
+  --iters 60 \
+  --val-batches -1 \
+  --learning-rate 1e-4 \
+  --steps-per-report 5 \
+  --steps-per-eval 10 \
+  --save-every 20 \
+  --num-layers 8 \
+  --max-seq-length 256
+
+./.venvbg/bin/python scripts/run_speculative_trace_benchmark.py \
+  --draft-adapter-path /Users/mark/Desktop/projects/toolcalltokenization/outputs/speculative_decoding/amazon_qwen05_lora \
+  --output /Users/mark/Desktop/projects/toolcalltokenization/outputs/speculative_decoding/amazon_speculative_lora.json
+```
+
+See:
+
+- [speculative_decoding/README.md](/Users/mark/Desktop/projects/toolcalltokenization/speculative_decoding/README.md)
+- [speculative_decoding/report.md](/Users/mark/Desktop/projects/toolcalltokenization/speculative_decoding/report.md)
 
 ## Focus
 

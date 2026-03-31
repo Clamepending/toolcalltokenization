@@ -602,6 +602,27 @@ def mine_frequent_chunks(
     return trimmed
 
 
+def count_chunk_matches(
+    sequences: Dict[str, List[str]],
+    chunk: Sequence[str],
+) -> Tuple[int, int]:
+    chunk_list = list(chunk)
+    chunk_len = len(chunk_list)
+    support = 0
+    occurrences = 0
+    for sequence in sequences.values():
+        if len(sequence) < chunk_len:
+            continue
+        matched_in_episode = False
+        for start in range(len(sequence) - chunk_len + 1):
+            if sequence[start : start + chunk_len] == chunk_list:
+                occurrences += 1
+                matched_in_episode = True
+        if matched_in_episode:
+            support += 1
+    return support, occurrences
+
+
 def train_bpe_tokens(
     sequences: Dict[str, List[str]],
     num_merges: int = 25,
@@ -687,6 +708,66 @@ def train_bpe_tokens(
         )
 
     return merges
+
+
+def mine_pair_merge_macros(
+    sequences: Dict[str, List[str]],
+    num_merges: int = 25,
+    min_occurrences: int = 2,
+    min_support: int = 2,
+    top_k: int = 50,
+    min_length: int = 2,
+    max_length: int | None = None,
+) -> List[dict]:
+    merges = train_bpe_tokens(
+        sequences,
+        num_merges=num_merges,
+        min_occurrences=min_occurrences,
+        min_support=min_support,
+    )
+
+    deduped: Dict[Tuple[str, ...], dict] = {}
+    for merge in merges:
+        sequence = list(merge.get("sequence", []))
+        if len(sequence) < min_length:
+            continue
+        if max_length is not None and len(sequence) > max_length:
+            continue
+        support, occurrences = count_chunk_matches(sequences, sequence)
+        if support < min_support or occurrences < min_occurrences:
+            continue
+        chunk = tuple(sequence)
+        candidate = {
+            "sequence": list(sequence),
+            "length": len(sequence),
+            "support": support,
+            "occurrences": occurrences,
+            "merge_token_id": merge.get("token_id"),
+        }
+        previous = deduped.get(chunk)
+        if previous is None or (
+            candidate["support"],
+            candidate["length"],
+            candidate["occurrences"],
+        ) > (
+            previous["support"],
+            previous["length"],
+            previous["occurrences"],
+        ):
+            deduped[chunk] = candidate
+
+    candidates = sorted(
+        deduped.values(),
+        key=lambda item: (
+            -item["support"],
+            -item["length"],
+            -item["occurrences"],
+            item["sequence"],
+        ),
+    )[:top_k]
+    for index, macro in enumerate(candidates, start=1):
+        macro["macro_id"] = f"P{index:03d}"
+    return candidates
 
 
 def apply_bpe_tokens(sequences: Dict[str, List[str]], merges: Sequence[dict]) -> Dict[str, List[str]]:
