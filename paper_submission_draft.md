@@ -13,7 +13,7 @@ This draft answers the main empirical questions directly.
 | Do macros make agents faster and cheaper? | Yes on the control plane: fewer model decisions, fewer tokens, lower planning depth. Not automatically on the browser plane, because a macro still expands to primitive browser actions. | Section 6 |
 | How much trace data is needed? | Useful search-phase macros emerge after only a handful of repeated traces, but site-wide curves improve more slowly and depend strongly on distribution purity. | Figure 4 |
 | What tokenization strategy works best? | Overly lossy tokenization gives the best raw compression, but richer dataflow tokenization is better for reusable callable macros. | Figure 2 |
-| Is brute-force discovery necessary? | Greedy pair-merge is a strong simpler baseline on clean buckets, but brute-force wins on overlapping/noisy buckets. | Figure 5 |
+| What compression / discovery algorithm is best? | For offline macro discovery, brute-force contiguous chunk mining with held-out promotion is the strongest choice. Greedy pair-merge is the best simple incremental baseline on clean buckets. We did not directly benchmark classic Sequitur. | Figure 5 |
 | Do all frontier models benefit similarly? | We only have partial evidence. A no-training frontier LLM selector benefits substantially on MiniWoB but not on WorkArena; a controlled cross-frontier sweep remains open. | Section 7 |
 
 ## 1. Method
@@ -447,6 +447,38 @@ did **not** stabilize yet. The reason is not that long macros are impossible. Th
 
 ![Brute-force vs pair-merge](docs/figures/pair_merge_vs_bruteforce.svg)
 
+This section answers the practical algorithm choice question directly.
+
+### 10.1 Short Answer
+
+If the goal is **best offline macro discovery quality**, the best current algorithm in this repo is:
+
+- **brute-force contiguous chunk mining + held-out promotion**
+
+If the goal is **simpler incremental growth with low engineering overhead**, the best current baseline is:
+
+- **greedy repeated-pair replacement**, which is closer to **Re-Pair** than classic **Sequitur**
+
+So the recommendation is:
+
+- use **brute force** as the default research and offline-registry builder
+- use **pair-merge / Re-Pair-style growth** only if online simplicity or incremental updates matter more than recovering every overlapping candidate
+
+### 10.2 What We Actually Compared
+
+We directly compared:
+
+- brute-force frequent contiguous chunk mining
+- greedy repeated-pair replacement
+
+We did **not** run a full classic online Sequitur implementation in this paper. So the honest statement is not “brute force beats Sequitur,” but rather:
+
+- brute force beats the greedy pair-merge baseline we tested on noisy overlapping buckets
+- greedy pair-merge ties brute force on many clean hierarchical buckets
+- classic Sequitur remains an open comparison
+
+### 10.3 Empirical Result
+
 Greedy repeated-pair replacement is a strong simpler baseline.
 
 What it gets right:
@@ -462,6 +494,20 @@ Where it loses:
 - it commits to one merge hierarchy
 - browser tool libraries often want overlapping callable routines
 - brute force can keep overlapping candidates alive and let held-out replay decide later
+
+### 10.4 Final Recommendation
+
+The best current algorithm choice is therefore:
+
+1. **Offline registry construction:** brute-force chunk mining with held-out promotion
+2. **Potential future online/incremental macro growth:** greedy pair-merge / Re-Pair-style updates
+3. **Not yet recommended without a direct benchmark:** classic Sequitur
+
+The reason is simple:
+
+- browser-agent macro discovery is not pure compression
+- it is compression **plus** callability, replay precision, overlap, and held-out utility
+- brute force is currently the strongest method for that full objective
 
 Concrete example:
 
