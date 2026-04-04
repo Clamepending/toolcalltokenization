@@ -8,13 +8,13 @@ This draft answers the main empirical questions directly.
 
 | Question | Answer | Strongest Evidence |
 | --- | --- | --- |
-| Do macros reduce browser-agent task success? | Not in our controlled live benchmarks. Success stayed at `100%` in all tested macro-aware conditions on MiniWoB and WorkArena. | Figure 1, Figure 3 |
+| Do macros reduce browser-agent task success? | On the non-saturated MiniWoB full-slice benchmark, guarded macros preserved primitive success exactly at `94.44%` while cutting decisions by `50%`. On WorkArena, all tested live controllers stayed at `100%`. | Figure 1, Section 3 |
 | How many model calls are saved? | Up to `64.29%` on WorkArena service-catalog and `60.0%` on MiniWoB. Real Amazon search traces already reach `41.67%` held-out reduction inside a live production-agent family. | Figure 1, Figure 4 |
 | Do macros make agents faster and cheaper? | Yes on the control plane: fewer model decisions, fewer tokens, lower planning depth. Not automatically on the browser plane, because a macro still expands to primitive browser actions. | Section 6 |
 | How much trace data is needed? | Useful search-phase macros emerge after only a handful of repeated traces, but site-wide curves improve more slowly and depend strongly on distribution purity. | Figure 4 |
 | What tokenization strategy works best? | Overly lossy tokenization gives the best raw compression, but richer dataflow tokenization is better for reusable callable macros. | Figure 2 |
-| What compression / discovery algorithm is best? | For offline macro discovery, brute-force contiguous chunk mining with held-out promotion is the strongest choice. Greedy pair-merge is the best simple incremental baseline on clean buckets. We did not directly benchmark classic Sequitur. | Figure 5 |
-| Do all frontier models benefit similarly? | We only have partial evidence. A no-training frontier LLM selector benefits substantially on MiniWoB but not on WorkArena; a controlled cross-frontier sweep remains open. | Section 7 |
+| What compression / discovery algorithm is best? | For offline macro discovery, brute-force contiguous chunk mining with held-out promotion is the strongest choice. Greedy pair-merge is the best simple incremental baseline on clean buckets. We did not directly benchmark classic Sequitur. | Figure 6 |
+| Do all frontier models benefit similarly? | No. On the same WorkArena replay benchmark, `GPT-4.1-mini` saves `17.86%` of decisions and a local `Llama 3.2 3B` saves `42.86%`, while `Claude Sonnet 4.5`, `Claude Opus 4.1`, `Gemini 2.5 Flash`, `Llama 3.3 70B`, and `Qwen 2.5 72B` all choose zero macros under the same prompt and guard. | Figure 5, Section 7 |
 
 ## 1. Method
 
@@ -170,7 +170,7 @@ Macros mainly reduce controller time unless the macro runtime itself is made che
 
 ![Figure 1: Accuracy vs model-call savings](docs/figures/paper_accuracy_vs_calls_saved.svg)
 
-**Figure 1.** Each point is a live controller. The x-axis is the fraction of model decisions saved relative to a primitive baseline; the y-axis is task success rate. Bubble area increases with the absolute number of decisions saved.
+**Figure 1.** Two live benchmark panels. Bars show the fraction of controller decisions saved relative to a primitive baseline; the overlaid line shows task success. The MiniWoB panel uses the full non-saturated task slice so that accuracy is measurable rather than saturated.
 
 ### 3.1 WorkArena
 
@@ -185,21 +185,20 @@ The key result is that macros did **not** reduce task success in this benchmark.
 
 ### 3.2 MiniWoB
 
-On live MiniWoB stable tasks:
+On the full non-saturated MiniWoB slice:
 
-- primitive baseline: `80 -> 80`, `100%` success
-- oracle macro controller: `80 -> 32`, `60.0%` reduction, `100%` success
-- learned controller: `80 -> 32`, `60.0%` reduction, `100%` success
-- no-training GPT-4.1-mini selector with guard: `80 -> 43`, `46.25%` reduction, `100%` success
+- primitive baseline: `88 -> 88`, `94.44%` success
+- task-scoped semantic selector with guard: `88 -> 44`, `50.0%` reduction, `94.44%` success
+- global semantic selector without guard: `88 -> 130`, `-47.73%` reduction, `94.44%` success
 
-MiniWoB shows the “easy regime”: dense repeated workflows, clean action families, and little ambiguity.
+This is the most direct answer to the accuracy question in a non-saturated setting: macros can cut controller decisions in half without changing observed task success. The contrast with the unguarded global action space also shows the main failure mode clearly: poor macro exposure hurts efficiency first.
 
 ### 3.3 Answer to the Main Accuracy Question
 
-Across the live browser benchmarks we ran, macros did **not** reduce task completion rate. The practical conclusion is:
+Across the live browser benchmarks we ran, guarded macros did **not** reduce observed task completion rate. The practical conclusion is:
 
 - macro execution is reliable once the macro is selected
-- the main failure mode is bad selection, not macro runtime correctness
+- the main failure mode is bad selection or over-broad exposure, not macro runtime correctness
 
 ## 4. Tokenization Strategy Ablation
 
@@ -270,7 +269,7 @@ This is not a failure of the idea. It is a data-distribution issue.
 
 ## 6. Data Scaling and Diminishing Returns
 
-![Amazon traces vs decision reduction](docs/figures/ottoauth_amazon_compression_vs_traces.svg)
+![Amazon traces vs decision reduction](docs/figures/paper_amazon_scaling.svg)
 
 **Figure 4.** On real OttoAuth Amazon traces, search macros emerge quickly; cart emerges more slowly; site-wide gains are weaker because workflow families are mixed.
 
@@ -286,7 +285,7 @@ Current OttoAuth Amazon results under a `ceil(20%)` held-out split:
 Two conclusions matter:
 
 1. **Search macros emerge first.**
-   The first real e-commerce macro is effectively `amazon_search(query)`.
+   The first real e-commerce macro is a search-entry routine; richer cart and checkout routines remain data-limited.
 
 2. **Distribution matters as much as count.**
    More traces help only if they come from the same workflow family and the policy solves them in similar ways.
@@ -303,34 +302,43 @@ In practice, the right unit of collection is **site::workflow**, not just **site
 
 ## 7. Frontier Models and Selector Behavior
 
-This question is only **partially answered** in the current draft.
+![Model-family sweep](docs/figures/paper_model_family_sweep.svg)
 
-What we did evaluate:
+**Figure 5.** Same-prompt, same-guard, same-registry WorkArena replay sweep across model families. Most closed models in this setup chose zero macros; the best performer was a local `Llama 3.2 3B`.
 
-- a no-training frontier LLM selector using `gpt-4.1-mini`
-- the same macro libraries under oracle, learned, and LLM selection
-- OttoAuth trace collection using Claude Sonnet 4.5 in the production-style extension
+We now have a same-protocol cross-model selector sweep on WorkArena replay with the same:
 
-What we found:
+- macro registry
+- structural guard
+- prompt format
+- replay episodes
 
-- the same frontier LLM selector behaves very differently across datasets
-  - MiniWoB + guard: `46.25%` decision reduction
-  - WorkArena + guard: `3.57%`
-- therefore the main variable is not just “which frontier model”, but also:
-  - action-space ambiguity
-  - precondition quality
-  - task-family density
+Models tested:
 
-What remains open:
+- `GPT-4.1-mini`
+- `Claude Sonnet 4.5`
+- `Claude Opus 4.1`
+- `Gemini 2.5 Flash`
+- `Llama 3.3 70B`
+- `Qwen 2.5 72B`
+- local `Llama 3.2 3B`
 
-- we did **not** run a controlled multi-frontier selector sweep with several closed frontier models on the same benchmark and prompt.
+What we found is much sharper than the earlier draft:
 
-So the honest answer is:
+- local `Llama 3.2 3B`: `42.86%` decision reduction, `100%` macro success
+- `GPT-4.1-mini`: `17.86%` decision reduction, `50%` macro success
+- `Claude Sonnet 4.5`: `0%`
+- `Claude Opus 4.1`: `0%`
+- `Gemini 2.5 Flash`: `0%`
+- `Llama 3.3 70B`: `0%`
+- `Qwen 2.5 72B`: `0%`
 
-- **No, we cannot yet claim that all frontier models get the same benefits.**
-- **Yes, we can claim that a frontier-model-only no-training selector is not sufficient by itself in realistic crowded action spaces.**
+So the answer is now unambiguous:
 
-This is the one major experimental gap still open in the current paper draft.
+- **No, frontier models do not get similar macro benefits by default.**
+- **Yes, model-family choice alone can dominate selector quality, even under the same macro library and guard.**
+
+What remains open is narrower: we still do not have a full same-protocol **live** multi-frontier sweep, only a live GPT-4.1-mini condition plus the replay sweep above.
 
 ## 8. How Much Faster and Cheaper?
 
@@ -401,7 +409,14 @@ FORM_INPUT|use=B03
 COMPUTER|role=key|use=B04
 ```
 
-This is effectively `amazon_search(query)`.
+At the primitive trace level this macro exposes four bindings, but only one is really semantic:
+
+- `B01`: navigation target / page entry point
+- `B02`: element-search query used by the primitive `find` tool
+- `B03`: the actual user search string
+- `B04`: the submit key event
+
+So this is **not** a four-argument user-level tool. It is an over-parameterized primitive trace template whose semantic form is closer to `amazon_search(query)`, with the other bindings treated as execution-level slots or defaults.
 
 ### 9.2 United Flight Search
 
@@ -445,7 +460,7 @@ did **not** stabilize yet. The reason is not that long macros are impossible. Th
 
 ## 10. Brute Force vs Greedy Pair-Merge
 
-![Brute-force vs pair-merge](docs/figures/pair_merge_vs_bruteforce.svg)
+![Brute-force vs pair-merge](docs/figures/paper_pair_merge_vs_bruteforce.svg)
 
 This section answers the practical algorithm choice question directly.
 
@@ -588,9 +603,7 @@ python3 scripts/run_ottoauth_amazon_study.py \
   --input hf_datasets/ottoauth_local_agent_snapshot/processed/canonical_trace.jsonl \
   --output /tmp/ottoauth_amazon_study.json
 
-python3 scripts/generate_ottoauth_amazon_compression_figure.py \
-  --input /tmp/ottoauth_amazon_study.json \
-  --output /tmp/ottoauth_amazon_compression_vs_traces.svg
+python3 scripts/generate_paper_figures.py
 ```
 
 ### 12.2 Key Scripts
@@ -600,6 +613,7 @@ python3 scripts/generate_ottoauth_amazon_compression_figure.py \
 - replay evaluation: `scripts/macro_replay_eval.py`
 - data scaling: `scripts/run_macro_data_scaling_study.py`
 - pair-merge baseline: `scripts/run_pair_merge_macro_comparison.py`
+- paper figures: `scripts/generate_paper_figures.py`
 - live WorkArena evaluation: `scripts/run_workarena_live_policy_benchmark.py`
 - OttoAuth Amazon study: `scripts/run_ottoauth_amazon_study.py`
 
@@ -622,8 +636,8 @@ The main repo README now includes the OttoAuth collection walkthrough, including
 
 This draft is strong on the core action-chunking question, but a few limitations remain:
 
-1. **No controlled multi-frontier selector sweep.**
-   We evaluated one no-training frontier selector (`gpt-4.1-mini`), not several closed frontier models under the same protocol.
+1. **No same-protocol live multi-frontier sweep yet.**
+   We now have a same-protocol replay sweep across several frontier families, but not yet a same-protocol live sweep across all of them.
 
 2. **Long e-commerce macros remain data-limited.**
    We have strong search-phase evidence, early cart evidence, and not yet enough repeated checkout traces.
@@ -643,7 +657,9 @@ The main claim that survives all of the current experiments is:
 More concretely:
 
 - macros do **not** reduce task success in our live benchmarks
+- guarded macros preserve baseline success on the non-saturated MiniWoB slice
 - they can save `35%–64%` of model decisions on realistic repeated workflow families
+- model family matters sharply: some strong LLMs choose no macros at all under the same prompt and guard
 - they are already beginning to emerge from real production-agent Amazon traces
 - data quality and workflow purity matter more than raw trace count
 - tokenization should be chosen for **actionable macro utility**, not just raw compression

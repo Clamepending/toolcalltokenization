@@ -41,58 +41,144 @@ def plot_headline_figure(output_path: Path) -> None:
         "Oracle": load_json(OUTPUTS / "workarena_service_catalog_v1_oracle_live_v3_live_policy_benchmark.json")["summary"],
     }
     miniwob = {
-        "Learned": load_json(OUTPUTS / "miniwob_live_v3_learned_global_noguard_stable_learned_policy_benchmark.json")["summary"],
-        "LLM": load_json(OUTPUTS / "miniwob_live_v3_llm_global_guard_stable_v2_llm_policy_benchmark.json")["summary"],
-        "Oracle": load_json(OUTPUTS / "miniwob_live_v3_global_taskregistry_oracle_stable_macro_policy_benchmark.json")["summary"],
-        "Primitive": {
-            "decision_reduction_ratio": 0.0,
-            "success_rate": 1.0,
-            "steps_saved": 0,
-            "primitive_steps": 80,
-        },
+        "Primitive": load_json(OUTPUTS / "miniwob_live_v3_benchmark.json")["summary"],
+        "Task+Guard": load_json(OUTPUTS / "miniwob_live_v3_semantic_task_guard_m0_semantic_policy_benchmark.json")["summary"],
+        "Global-NoGuard": load_json(OUTPUTS / "miniwob_live_v3_semantic_global_m0_semantic_policy_benchmark.json")["summary"],
     }
 
-    colors = {
-        "Primitive": "#4c566a",
-        "LLM": "#d08770",
-        "Learned": "#5e81ac",
-        "Oracle": "#2e3440",
-    }
-
-    fig, axes = plt.subplots(1, 2, figsize=(11.5, 5.2), sharey=True)
+    fig, axes = plt.subplots(1, 2, figsize=(13.2, 5.6), sharey=False)
     for ax, title, payload in [
-        (axes[0], "WorkArena Service Catalog", workarena),
-        (axes[1], "MiniWoB Stable Tasks", miniwob),
+        (axes[0], "WorkArena (realistic, saturated success)", workarena),
+        (axes[1], "MiniWoB full slice (non-saturated success)", miniwob),
     ]:
-        for label, summary in payload.items():
-            x = float(summary["decision_reduction_ratio"]) * 100.0
-            y = float(summary["success_rate"]) * 100.0
-            saved = float(summary.get("steps_saved", 0))
-            ax.scatter(
-                [x],
-                [y],
-                s=110 + 16 * saved,
-                color=colors[label],
-                alpha=0.92,
-                edgecolors="white",
-                linewidths=1.2,
-                zorder=3,
-            )
-            ax.annotate(
-                f"{label}\n{x:.1f}% saved",
-                (x, y),
-                xytext=(6, 6 if label != "Primitive" else -18),
-                textcoords="offset points",
-                fontsize=9,
-            )
+        labels = list(payload.keys())
+        xs = list(range(len(labels)))
+        saved = [float(payload[label]["decision_reduction_ratio"]) * 100.0 for label in labels]
+        success = [float(payload[label]["success_rate"]) * 100.0 for label in labels]
+
+        bars = ax.bar(xs, saved, color=["#4c566a", "#5e81ac", "#d08770", "#2e3440"][: len(labels)], alpha=0.9)
         ax.set_title(title, fontsize=12, pad=10)
-        ax.set_xlim(-2, 70)
-        ax.set_ylim(90, 101.5)
-        ax.grid(True, axis="both", linestyle="--", linewidth=0.5, alpha=0.35)
-        ax.set_xlabel("Model calls saved per task (%)")
-    axes[0].set_ylabel("Task success rate (%)")
-    fig.suptitle("Macros preserve success while saving many controller decisions", fontsize=14, y=0.98)
+        ax.set_xticks(xs)
+        ax.set_xticklabels(labels, rotation=14, ha="right")
+        ax.set_ylabel("Model calls saved (%)")
+        ax.grid(True, axis="y", linestyle="--", linewidth=0.5, alpha=0.35)
+        line_ax = ax.twinx()
+        line_ax.plot(xs, success, color="#bf616a", marker="o", linewidth=2.0)
+        line_ax.set_ylabel("Task success (%)")
+        if "MiniWoB" in title:
+            line_ax.set_ylim(92, 96)
+        else:
+            line_ax.set_ylim(95, 101)
+        for bar, reduction in zip(bars, saved):
+            ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 1.2, f"{reduction:.1f}", ha="center", va="bottom", fontsize=9)
+        for idx, score in enumerate(success):
+            line_ax.annotate(f"{score:.1f}", (xs[idx], score), xytext=(0, 7), textcoords="offset points", ha="center", fontsize=9, color="#bf616a")
+
+    fig.suptitle("Guarded macros save controller calls while preserving observed task success", fontsize=14, y=0.98)
     fig.tight_layout(rect=(0, 0, 1, 0.95))
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(output_path, bbox_inches="tight")
+    plt.close(fig)
+
+
+def plot_amazon_scaling(output_path: Path) -> None:
+    payload = load_json(OUTPUTS / "ottoauth_amazon_study.json")
+    curves = payload["curves"]
+    fig, ax = plt.subplots(figsize=(7.4, 4.8))
+    color_map = {
+        "amazon.com": "#2e3440",
+        "amazon.com::search": "#5e81ac",
+        "amazon.com::cart": "#a3be8c",
+        "amazon.com::checkout": "#d08770",
+    }
+    for key in ["amazon.com", "amazon.com::search", "amazon.com::cart", "amazon.com::checkout"]:
+        if key not in curves:
+            continue
+        points = curves[key]["points"]
+        xs = [int(point["total_episodes"]) for point in points]
+        ys = [float(point["decision_reduction_ratio"]) * 100.0 for point in points]
+        ax.plot(xs, ys, marker="o", linewidth=2.0, label=key.replace("amazon.com::", ""), color=color_map.get(key))
+    ax.set_title("Amazon trace scaling by workflow family", fontsize=12, pad=10)
+    ax.set_xlabel("Total traces in bucket")
+    ax.set_ylabel("Held-out decision reduction (%)")
+    ax.grid(True, linestyle="--", linewidth=0.5, alpha=0.35)
+    ax.legend(frameon=False, loc="upper left")
+    fig.tight_layout()
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(output_path, bbox_inches="tight")
+    plt.close(fig)
+
+
+def plot_pair_merge_clean(output_path: Path) -> None:
+    amazon = load_json(OUTPUTS / "pair_merge_vs_bruteforce_ottoauth_amazon_families.json")["results"]
+    mind2web = load_json(OUTPUTS / "pair_merge_vs_bruteforce_mind2web_selected.json")["results"]
+    rows = []
+    for item in amazon + mind2web:
+        rows.append(
+            (
+                item["group_key"],
+                float(item["bruteforce"]["decision_reduction_ratio"]) * 100.0,
+                float(item["pair_merge"]["decision_reduction_ratio"]) * 100.0,
+            )
+        )
+    rows.sort(key=lambda row: row[0])
+    labels = [row[0] for row in rows]
+    brute = [row[1] for row in rows]
+    pair = [row[2] for row in rows]
+    x = list(range(len(labels)))
+    width = 0.34
+    fig, ax = plt.subplots(figsize=(9.5, 4.8))
+    ax.bar([v - width / 2 for v in x], brute, width=width, color="#5e81ac", label="Brute-force")
+    ax.bar([v + width / 2 for v in x], pair, width=width, color="#88c0d0", label="Pair-merge")
+    ax.set_title("Brute-force chunk mining is stronger on overlapping buckets", fontsize=12, pad=10)
+    ax.set_ylabel("Held-out decision reduction (%)")
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels, rotation=20, ha="right")
+    ax.grid(True, axis="y", linestyle="--", linewidth=0.5, alpha=0.35)
+    ax.legend(frameon=False, loc="upper right")
+    fig.tight_layout()
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(output_path, bbox_inches="tight")
+    plt.close(fig)
+
+
+def plot_model_family_sweep(output_path: Path) -> None:
+    runs = [
+        ("Llama 3.2 3B (local)", load_json(OUTPUTS / "workarena_service_catalog_v1_ollama_llama32_3b_taskfamily_selector.json")["summary"], "#88c0d0"),
+        ("GPT-4.1-mini", load_json(OUTPUTS / "workarena_service_catalog_v1_llm_guard_selector_v2.json")["summary"], "#5e81ac"),
+        ("Claude Sonnet 4.5", load_json(OUTPUTS / "workarena_service_catalog_v1_openrouter_claude_sonnet45_taskfamily_selector.json")["summary"], "#8fbcbb"),
+        ("Claude Opus 4.1", load_json(OUTPUTS / "workarena_service_catalog_v1_openrouter_claude_opus41_taskfamily_selector.json")["summary"], "#5e81ac"),
+        ("Gemini 2.5 Flash", load_json(OUTPUTS / "workarena_service_catalog_v1_openrouter_gemini25flash_taskfamily_selector.json")["summary"], "#a3be8c"),
+        ("Llama 3.3 70B", load_json(OUTPUTS / "workarena_service_catalog_v1_openrouter_llama33_70b_taskfamily_selector.json")["summary"], "#4c566a"),
+        ("Qwen 2.5 72B", load_json(OUTPUTS / "workarena_service_catalog_v1_openrouter_qwen25_72b_taskfamily_selector.json")["summary"], "#d08770"),
+    ]
+    runs.sort(key=lambda row: float(row[1]["decision_reduction_ratio"]), reverse=True)
+    labels = [row[0] for row in runs]
+    reductions = [float(row[1]["decision_reduction_ratio"]) * 100.0 for row in runs]
+    macro_success = [float(row[1]["macro_success_rate"]) * 100.0 for row in runs]
+    colors = [row[2] for row in runs]
+    y = list(range(len(labels)))
+
+    fig, ax = plt.subplots(figsize=(9.8, 5.8))
+    bars = ax.barh(y, reductions, color=colors, alpha=0.92)
+    ax.set_title("Macro benefits vary sharply across model families on the same replay benchmark", fontsize=12, pad=10)
+    ax.set_xlabel("Decision reduction on WorkArena replay (%)")
+    ax.set_yticks(y)
+    ax.set_yticklabels(labels)
+    ax.grid(True, axis="x", linestyle="--", linewidth=0.5, alpha=0.35)
+    right = ax.twiny()
+    right.plot(macro_success, y, color="#bf616a", marker="o", linewidth=2.0)
+    right.set_xlabel("Macro success rate (%)")
+    right.set_xlim(0, 105)
+    ax.invert_yaxis()
+    for bar, reduction in zip(bars, reductions):
+        x = bar.get_width()
+        anchor = x + 1.2 if x >= 0 else x - 1.2
+        align = "left" if x >= 0 else "right"
+        ax.text(anchor, bar.get_y() + bar.get_height() / 2, f"{reduction:.1f}", ha=align, va="center", fontsize=9)
+    for idx, value in enumerate(macro_success):
+        right.annotate(f"{value:.0f}", (value, y[idx]), xytext=(6, 0), textcoords="offset points", va="center", fontsize=9, color="#bf616a")
+    fig.tight_layout()
     output_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(output_path, bbox_inches="tight")
     plt.close(fig)
@@ -186,6 +272,21 @@ def main() -> None:
         default=str(DOCS / "paper_tokenization_ablation.svg"),
         help="Tokenization ablation figure output path.",
     )
+    parser.add_argument(
+        "--amazon-output",
+        default=str(DOCS / "paper_amazon_scaling.svg"),
+        help="Amazon scaling figure output path.",
+    )
+    parser.add_argument(
+        "--pair-output",
+        default=str(DOCS / "paper_pair_merge_vs_bruteforce.svg"),
+        help="Pair-merge comparison figure output path.",
+    )
+    parser.add_argument(
+        "--model-output",
+        default=str(DOCS / "paper_model_family_sweep.svg"),
+        help="Model-family selector comparison figure output path.",
+    )
     args = parser.parse_args()
 
     raw_datasets = {
@@ -217,6 +318,9 @@ def main() -> None:
         utility_payloads=utility_payloads,
         output_path=Path(args.tokenization_output),
     )
+    plot_amazon_scaling(Path(args.amazon_output))
+    plot_pair_merge_clean(Path(args.pair_output))
+    plot_model_family_sweep(Path(args.model_output))
 
 
 if __name__ == "__main__":
